@@ -99,7 +99,7 @@ class StartSession {
 					noOfGroups = Utilities.scan.nextInt();
 					System.out.println("No of students present in each group : ");
 					noOfStudentsInGroup = Utilities.scan.nextInt();
-					quiz = new Quiz(noOfStudents,noOfGroups,noOfStudentsInGroup,subject,teacherName,date);
+					quiz = new Quiz(noOfStudents,noOfGroups,noOfStudentsInGroup,subject,teacherName,date, databaseConnection);
 					// This initiates the quiz with the parameters specified above
 					quiz.start();
 					break;

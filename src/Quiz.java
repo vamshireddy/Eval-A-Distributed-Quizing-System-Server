@@ -12,10 +12,16 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Time;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.net.*;
+
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
 
 public class Quiz {
 	private static int port = Utilities.recvPort;
@@ -26,30 +32,31 @@ public class Quiz {
 	private String teacherName;
 	private Date date;
 	private String timeStamp;
-	private Student[] students;			// for all the students participating
+	private ArrayList<Student> studentsList;		// for all the students participating
 	private List[] groups;				// for all the groups for the session
 	private DatagramSocket sendSocket;  // Socket used for sending, which has ephemeral port number
 	private DatagramSocket recvSocket;  // Socket used for receiving 
 	private int currentSeqNo;
-	private ByteArrayInputStream bais;
-	private ObjectInputStream ois;
-	private ByteArrayOutputStream baos;
-	private ObjectOutputStream oos;
-	
-	public Quiz(int noOfStudents,int noOfgroups,int noOfStudentsInGroup,String subject,String teacherName,Date date)
+	private Connection con;
+	private int seqno;
+	public Quiz(int noOfStudents,int noOfgroups,int noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c)
 	{
+		this.seqno = 0;
+		this.con = c;
 		this.noOfGroups = noOfgroups;
 		this.noOfStudents = noOfStudents;
 		this.noOfStudentsInGroup = noOfStudentsInGroup;
 		this.teacherName = teacherName;
+		this.studentsList = new ArrayList<Student>();
 		this.date = date;
 		timeStamp = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime());
 		try {
 			
 			sendSocket = new DatagramSocket();
 			recvSocket = new DatagramSocket(null);
+			// Set the socket to reuse the address
 			recvSocket.setReuseAddress(true);
-			recvSocket.bind(new InetSocketAddress(65321));
+			recvSocket.bind(new InetSocketAddress(Utilities.recvPort));
 			
 		} catch (SocketException e) {
 			e.printStackTrace();
@@ -72,31 +79,32 @@ public class Quiz {
 		    recvSocket.receive(pack);
 		    
 		    // Deserialize the Packet object and store in the object 'p'
-		    bais = new ByteArrayInputStream(buffer);
-		    ois = new ObjectInputStream(bais);
-		    Packet data_packet = (Packet) ois.readObject();
+		    Packet data_packet = (Packet)Utilities.deserialize(buffer);
 		    
 		    // Deserialize the data string to an appropriate object based on the flags present in the packet received
-		    bais = new ByteArrayInputStream(data_packet.data);
-	    	ois = new ObjectInputStream(bais);
+		    Object obj = Utilities.deserialize(data_packet.data);
 	    	
+	    	AuthPacket auth_packet = null;
 	    	
 		    if( data_packet.auth_packet == true )
 		    {	
-		    	AuthPacket auth_packet = (AuthPacket) ois.readObject();
+		    	auth_packet = (AuthPacket)obj;
 		    	System.out.println("Auth packet it is!!  Username: "+auth_packet.userName+" Password : "+auth_packet.password);
 		    }
-		    
-		    // Send ACK
-		    Packet p = new Packet(data_packet.seq_no+1);
-		    baos = new ByteArrayOutputStream();
-		    oos = new ObjectOutputStream(baos);
-		    oos.writeObject(p);
-		    oos.flush();
-		    byte[] Buf = baos.toByteArray();
-		    DatagramPacket ack_pack = new DatagramPacket(Buf, Buf.length,InetAddress.getByName("localhost"),12356);
-		    sendSocket.send(ack_pack);
-			
+		    else
+		    {
+		    	return;
+		    }
+
+		    if( verifyDetails(auth_packet.userName, auth_packet.password) == true )
+		    {
+		    	grantAccess(true);
+		    	addStudent(pack.getAddress(),auth_packet.userName);
+		    }
+		    else
+		    {
+		    	grantAccess(false);
+		    }
 		}
 		catch (SocketException e)
 		{
@@ -105,31 +113,60 @@ public class Quiz {
 		catch (IOException e)
 		{
 			e.printStackTrace();
-		} catch (ClassNotFoundException e) {
+		}
+	}
+	
+	private void grantAccess(boolean flag)
+	{
+		Packet p = new Packet(seqno++,flag,false,false);
+		byte[] buf = Utilities.serialize(p);
+		
+		DatagramPacket pack = new DatagramPacket(buf, buf.length);
+		try {
+			sendSocket.send(pack);
+		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 	
-	public void sendAck(int no)
+	public boolean verifyDetails(String id, String password)
 	{
-		AckPacket ack_pack = new AckPacket(no);
-		
-	    
-	    try {
-	    	baos = new ByteArrayOutputStream();
-	    	oos = new ObjectOutputStream(baos);
-			oos.writeObject(ack_pack);
-			oos.flush();
-			byte[] send_ack = baos.toByteArray();
-			
-			DatagramPacket pack = new DatagramPacket(send_ack, send_ack.length, InetAddress.getByName("localhost"),12345);
-			sendSocket.send(pack);
-			
-		} catch (IOException e) {
+		try {
+			// Prepare the statement to be executed on the database with the necessary query string
+			PreparedStatement p = (PreparedStatement)con.prepareStatement("select * from student_info where roll_number='"+id+
+																"' and password='"+password+"'");
+			ResultSet result = p.executeQuery();
+			// result will initially point to the record before the 1st record. To access the 1st record, use result.next().
+			// If it returns null, then the teacher won't be authenticated with the given details
+			if( result.next() )
+			{
+				// After getting the matched record from the database, we extract the Teacher name and subject name
+				return true;
+			}
+			else
+			{
+				// UserID and Password doesn't exist in the database
+				return false;
+			}
+		} 
+		catch (SQLException e) 
+		{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	    // get the byte array of the object 
+		System.out.println("Error in the database query ");
+		System.exit(0);// included for completeness
+		return false;
+	}
+	
+	void addStudent(InetAddress ip, String uname)
+	{
+		// Add student to the list
+		Student s = new Student(ip, uname);
+		if( !studentsList.contains(s) )
+		{
+			studentsList.add(s);
+		}
 	}
 }
