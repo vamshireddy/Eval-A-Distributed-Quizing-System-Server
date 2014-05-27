@@ -83,6 +83,16 @@ public class Quiz {
 		    	AuthPacket auth_packet = (AuthPacket) ois.readObject();
 		    	System.out.println("Auth packet it is!!  Username: "+auth_packet.userName+" Password : "+auth_packet.password);
 		    }
+		    
+		    // Send ACK
+		    Packet p = new Packet(data_packet.seq_no+1);
+		    baos = new ByteArrayOutputStream();
+		    oos = new ObjectOutputStream(baos);
+		    oos.writeObject(p);
+		    oos.flush();
+		    byte[] Buf = baos.toByteArray();
+		    DatagramPacket ack_pack = new DatagramPacket(Buf, Buf.length,InetAddress.getByName("localhost"),1441);
+		    sendSocket.send(ack_pack);
 			
 		}
 		catch (SocketException e)
