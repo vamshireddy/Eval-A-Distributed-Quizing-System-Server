@@ -66,6 +66,7 @@ public class Quiz {
 	{
 		// This method is called when the teacher starts the quiz session
 		// Initial phase: Receive authentication packets from the students
+		while(true)
 		receiveAuthPackets();
 	}
 	
@@ -76,34 +77,49 @@ public class Quiz {
 			// Allocate the buffer of MAX_BUFFER_SIZE, which is defined in the Utilities class
 		    byte[] buffer = new byte[Utilities.MAX_BUFFER_SIZE];
 		    DatagramPacket pack =  new DatagramPacket(buffer, buffer.length);
+		    // Wait for the client's auth packet
 		    recvSocket.receive(pack);
 		    
+		    InetAddress clientIP = pack.getAddress();
 		    // Deserialize the Packet object and store in the object 'p'
 		    Packet data_packet = (Packet)Utilities.deserialize(buffer);
 		    
-		    // Deserialize the data string to an appropriate object based on the flags present in the packet received
+		    // Deserialize the data string to an appropriate object based on the flags present in the packet
 		    Object obj = Utilities.deserialize(data_packet.data);
 	    	
 	    	AuthPacket auth_packet = null;
 	    	
-		    if( data_packet.auth_packet == true )
+		    if( data_packet.auth_packet == true && data_packet.bcast == false 
+		    	&& data_packet.probe_packet == false && data_packet.data!=null)
 		    {	
 		    	auth_packet = (AuthPacket)obj;
-		    	System.out.println("Auth packet it is!!  Username: "+auth_packet.userName+" Password : "+auth_packet.password);
+		    	if( auth_packet.userName == null || auth_packet.grantAccess == true || auth_packet.password == null )
+		    	{
+		    		// Checks if the username, password are not null and also makes sure that client is not sending grantaccess as true
+		    		grantAccess(false,clientIP);
+		    		return;
+		    	}
+		    	System.out.println("Authentication Request recieved from the Client\n" +
+		    			"Username: "+auth_packet.userName+" \nPassword : "+auth_packet.password+"\n");
 		    }
 		    else
 		    {
+		    	// Send denyAccess to the client, so that the client would send the request again
+		    	grantAccess(false,clientIP);
 		    	return;
 		    }
-
+		    
+		    System.out.println("Now checking in the Database for the client record...\n");
 		    if( verifyDetails(auth_packet.userName, auth_packet.password) == true )
 		    {
-		    	grantAccess(true);
+		    	System.out.println("User is valid...Granted access.. Now sending reply..\n");
+		    	grantAccess(true, clientIP);
 		    	addStudent(pack.getAddress(),auth_packet.userName);
 		    }
 		    else
 		    {
-		    	grantAccess(false);
+		    	grantAccess(false,clientIP);
+		    	return;
 		    }
 		}
 		catch (SocketException e)
@@ -116,12 +132,13 @@ public class Quiz {
 		}
 	}
 	
-	private void grantAccess(boolean flag)
+	private void grantAccess(boolean flag,InetAddress clientIP)
 	{
-		Packet p = new Packet(seqno++,flag,false,false);
+		Packet p = new Packet(seqno++,true,false,false);
+		AuthPacket ap = new AuthPacket(true, flag);
+		p.data = Utilities.serialize(ap);
 		byte[] buf = Utilities.serialize(p);
-		
-		DatagramPacket pack = new DatagramPacket(buf, buf.length);
+		DatagramPacket pack = new DatagramPacket(buf, buf.length, clientIP, Utilities.clientPort);
 		try {
 			sendSocket.send(pack);
 		} catch (IOException e) {

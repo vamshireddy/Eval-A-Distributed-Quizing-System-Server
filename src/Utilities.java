@@ -19,7 +19,7 @@ public class Utilities {
 
 	// Port numbers
 	public static int recvPort = 4444;
-	
+	public static int clientPort = 5555;
 	// Utility objects
 	public static Scanner scan = new Scanner(System.in);
 	
@@ -29,7 +29,11 @@ public class Utilities {
 	    try {
 	    	bais = new ByteArrayInputStream(buffer);
 			ois = new ObjectInputStream(bais);
+			result = ois.readObject();
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
