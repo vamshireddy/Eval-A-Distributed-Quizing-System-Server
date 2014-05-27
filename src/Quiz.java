@@ -8,13 +8,14 @@ import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.sql.Date;
 import java.sql.Time;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-
+import java.net.*;
 
 public class Quiz {
 	private static int port = Utilities.recvPort;
@@ -46,7 +47,9 @@ public class Quiz {
 		try {
 			
 			sendSocket = new DatagramSocket();
-			recvSocket = new DatagramSocket(port);
+			recvSocket = new DatagramSocket(null);
+			recvSocket.setReuseAddress(true);
+			recvSocket.bind(new InetSocketAddress(65321));
 			
 		} catch (SocketException e) {
 			e.printStackTrace();
@@ -91,7 +94,7 @@ public class Quiz {
 		    oos.writeObject(p);
 		    oos.flush();
 		    byte[] Buf = baos.toByteArray();
-		    DatagramPacket ack_pack = new DatagramPacket(Buf, Buf.length,InetAddress.getByName("localhost"),1441);
+		    DatagramPacket ack_pack = new DatagramPacket(Buf, Buf.length,InetAddress.getByName("localhost"),12356);
 		    sendSocket.send(ack_pack);
 			
 		}
@@ -127,8 +130,6 @@ public class Quiz {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	   
-	    // get the byte array of the object
-	    
+	    // get the byte array of the object 
 	}
 }
