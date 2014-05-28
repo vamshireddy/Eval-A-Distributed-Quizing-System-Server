@@ -90,15 +90,15 @@ class StartSession {
 			case 1: // This case needs to access student database
 					break;
 			case 2:	// Initiates the Quiz
-					int noOfStudents;
-					int noOfGroups;
-					int noOfStudentsInGroup;
+					byte noOfStudents;
+					byte noOfGroups;
+					byte noOfStudentsInGroup;
 					System.out.println("No of students present in the class : ");
-					noOfStudents = Utilities.scan.nextInt();
+					noOfStudents = Utilities.scan.nextByte();
 					System.out.println("No of Groups : ");
-					noOfGroups = Utilities.scan.nextInt();
+					noOfGroups = Utilities.scan.nextByte();
 					System.out.println("No of students present in each group : ");
-					noOfStudentsInGroup = Utilities.scan.nextInt();
+					noOfStudentsInGroup = Utilities.scan.nextByte();
 					quiz = new Quiz(noOfStudents,noOfGroups,noOfStudentsInGroup,subject,teacherName,date, databaseConnection);
 					// This initiates the quiz with the parameters specified above
 					quiz.start();

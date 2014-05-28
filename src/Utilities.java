@@ -32,10 +32,12 @@ public class Utilities {
 			result = ois.readObject();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
+			System.out.println("safsa");
 			e.printStackTrace();
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			System.out.println("safsa");
 		}
 	    return result;
 	}

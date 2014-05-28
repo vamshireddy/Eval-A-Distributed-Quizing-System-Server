@@ -11,6 +11,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -25,9 +26,9 @@ import com.mysql.jdbc.PreparedStatement;
 
 public class Quiz {
 	private static int port = Utilities.recvPort;
-	private int noOfStudents;
-	private int noOfGroups;
-	private int noOfStudentsInGroup;
+	private byte noOfStudents;
+	private byte noOfGroups;
+	private byte noOfStudentsInGroup;
 	private String subject;
 	private String teacherName;
 	private Date date;
@@ -39,7 +40,8 @@ public class Quiz {
 	private int currentSeqNo;
 	private Connection con;
 	private int seqno;
-	public Quiz(int noOfStudents,int noOfgroups,int noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c)
+	private InetAddress broadcastIP;
+	public Quiz(byte noOfStudents,byte noOfgroups,byte noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c)
 	{
 		this.seqno = 0;
 		this.con = c;
@@ -57,17 +59,34 @@ public class Quiz {
 			// Set the socket to reuse the address
 			recvSocket.setReuseAddress(true);
 			recvSocket.bind(new InetSocketAddress(Utilities.recvPort));
+			// Set the broadcast IP
+			broadcastIP = InetAddress.getByName("192.168.1.255");
 			
 		} catch (SocketException e) {
+			e.printStackTrace();
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 	public void start()
 	{
 		// This method is called when the teacher starts the quiz session
-		// Initial phase: Receive authentication packets from the students
-		while(true)
-		receiveAuthPackets();
+		// Initial phase: Receive authentication packets from the 
+		System.out.println("There are "+noOfStudents+" No of students ");
+		System.out.println("Students list count : "+studentsList.size());
+		while(studentsList.size()!=noOfStudents)
+		{
+			receiveAuthPackets();
+		}
+		
+		// Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
+		ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, studentsList);
+		Packet packy = new Packet(seqno++, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
+		byte[] ser_bytes = Utilities.serialize(packy);
+		sendDatagramPacket(sendSocket, ser_bytes, broadcastIP , Utilities.clientPort);
+		System.out.println("Sent Configuration Parameters to everyone in the network!");
+		
 	}
 	
 	public void receiveAuthPackets()
@@ -85,6 +104,7 @@ public class Quiz {
 		    Packet data_packet = (Packet)Utilities.deserialize(buffer);
 		    
 		    // Deserialize the data string to an appropriate object based on the flags present in the packet
+			//System.out.println("data is "+data_packet.data);
 		    Object obj = Utilities.deserialize(data_packet.data);
 	    	
 	    	AuthPacket auth_packet = null;
@@ -134,9 +154,10 @@ public class Quiz {
 	
 	private void grantAccess(boolean flag,InetAddress clientIP)
 	{
-		Packet p = new Packet(seqno++,true,false,false);
+		
 		AuthPacket ap = new AuthPacket(true, flag);
-		p.data = Utilities.serialize(ap);
+		Packet p = new Packet(seqno++,true,false,false,Utilities.serialize(ap));
+		
 		byte[] buf = Utilities.serialize(p);
 		DatagramPacket pack = new DatagramPacket(buf, buf.length, clientIP, Utilities.clientPort);
 		try {
@@ -180,10 +201,29 @@ public class Quiz {
 	void addStudent(InetAddress ip, String uname)
 	{
 		// Add student to the list
+		for(Student stud:studentsList)
+		{
+			if( stud.uname == uname )
+			{
+				return;
+			}
+		}
 		Student s = new Student(ip, uname);
 		if( !studentsList.contains(s) )
 		{
 			studentsList.add(s);
+			System.out.println("Students list count : "+studentsList.size());
+		}
+	}
+	
+	void sendDatagramPacket(DatagramSocket sock, byte[] buff, InetAddress ip, int port)
+	{
+		DatagramPacket packet = new DatagramPacket(buff, buff.length, ip, port);
+		try {
+			sock.send(packet);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 }
