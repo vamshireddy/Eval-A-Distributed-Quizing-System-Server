@@ -42,11 +42,12 @@ public class Quiz {	private static int port = Utilities.recvPort;
 	private DatagramSocket recvSocket;  // Socket used for receiving 
 	private int currentSeqNo;
 	private Connection con;
-	private int seqno;
+	private int localSeqNo;
 	private InetAddress broadcastIP;
+	
 	public Quiz(byte noOfStudents,byte noOfgroups,byte noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c)
 	{
-		this.seqno = 0;
+		this.localSeqNo = 0;
 		this.con = c;
 		this.noOfGroups = noOfgroups;
 		this.noOfStudents = noOfStudents;
@@ -92,6 +93,7 @@ public class Quiz {	private static int port = Utilities.recvPort;
 		byte[] ser_bytes = Utilities.serialize(packy);
 		sendDatagramPacket(sendSocket, ser_bytes, broadcastIP , Utilities.clientPort);
 		System.out.println("Sent Configuration Parameters to everyone in the network!");*/
+		
 		System.out.println("Initial Session Complete. There are "+studentsList.size()+" students logged in\n");
 		for(int i=0;i<studentsList.size();i++)
 		{
@@ -99,8 +101,10 @@ public class Quiz {	private static int port = Utilities.recvPort;
 			System.out.println(s.uname+" : "+s.IP);
 		}
 		System.out.println("Initial Session Complete. There are "+studentsList.size()+" students logged in\n");
-		System.exit(1);
-		System.out.println("Exited!!");
+		sendSocket.close();
+		recvSocket.close();
+		System.exit(0);
+		
 	}
 	
 	public void receiveAuthPackets()
@@ -112,21 +116,27 @@ public class Quiz {	private static int port = Utilities.recvPort;
 		    DatagramPacket pack =  new DatagramPacket(buffer, buffer.length);
 		    // Wait for the client's auth packet
 		    recvSocket.receive(pack);
+		 
 		    
 		    InetAddress clientIP = pack.getAddress();
 		    // Deserialize the Packet object and store in the object 'p'
 		    Packet data_packet = (Packet)Utilities.deserialize(buffer);
+		    
+		    // Send the reply back by incrementing the seqno of the received packet
+		    localSeqNo = data_packet.seq_no+1;
+		    
 		    // Deserialize the data string to an appropriate object based on the flags present in the packet
 			//System.out.println("data is "+data_packet.data);
 		    Object obj = Utilities.deserialize(data_packet.data);
 	    	
+		    
 	    	AuthPacket auth_packet = null;
 	    	
 		    if( data_packet.auth_packet == true && data_packet.bcast == false 
 		    	&& data_packet.probe_packet == false && data_packet.data!=null)
 		    {	
 		    	auth_packet = (AuthPacket)obj;
-		    	if( auth_packet.userName == null || auth_packet.password == null )
+		    	if( auth_packet.userName.isEmpty() || auth_packet.password.isEmpty() )
 		    	{
 		    		// Checks if the username, password are not null and also makes sure that client is not sending grantaccess as true
 		    		grantAccess(false,clientIP, Utilities.INVALID_FIELDS);
@@ -195,12 +205,11 @@ public class Quiz {	private static int port = Utilities.recvPort;
 			ap = new AuthPacket(true, flag);
 		}
 		
-		Packet p = new Packet(seqno++,true,false,false,Utilities.serialize(ap));
+		Packet p = new Packet(localSeqNo,true,false,false,Utilities.serialize(ap));
 		
 		byte[] buf = Utilities.serialize(p);
 		DatagramPacket pack = new DatagramPacket(buf, buf.length, clientIP, Utilities.clientPort);
 		try {
-			sendSocket.send(pack);
 			sendSocket.send(pack);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -212,7 +221,16 @@ public class Quiz {	private static int port = Utilities.recvPort;
 	{
 		try {
 			// Prepare the statement to be executed on the database with the necessary query string
-			PreparedStatement p = (PreparedStatement)con.prepareStatement("select * from student_info where roll_number='"+id+
+			int id_int;
+			try
+			{
+				 id_int = Integer.parseInt(id);
+			}
+			catch( NumberFormatException e )
+			{
+				return false;
+			}
+			PreparedStatement p = (PreparedStatement)con.prepareStatement("select * from student_info where roll_number='"+id_int+
 																"' and password='"+password+"'");
 			ResultSet result = p.executeQuery();
 			// result will initially point to the record before the 1st record. To access the 1st record, use result.next().
@@ -220,6 +238,7 @@ public class Quiz {	private static int port = Utilities.recvPort;
 			if( result.next() )
 			{
 				// After getting the matched record from the database, we extract the Teacher name and subject name
+				System.out.println("TRUEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEe");
 				return true;
 			}
 			else
