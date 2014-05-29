@@ -22,11 +22,13 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.net.*;
 
+import javax.jws.Oneway;
+import javax.print.DocFlavor.STRING;
+
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
 
-public class Quiz {
-	private static int port = Utilities.recvPort;
+public class Quiz {	private static int port = Utilities.recvPort;
 	private byte noOfStudents;
 	private byte noOfGroups;
 	private byte noOfStudentsInGroup;
@@ -76,10 +78,14 @@ public class Quiz {
 		// Initial phase: Receive authentication packets from the 
 		System.out.println("There are "+noOfStudents+" No of students ");
 		System.out.println("Students list count : "+studentsList.size());
-		while(studentsList.size()!=noOfStudents)
+
+		while( studentsList.size() < noOfStudents )
 		{
 			receiveAuthPackets();
 		}
+		
+		
+		
 		// Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
 		/*ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, studentsList);
 		Packet packy = new Packet(seqno++, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
@@ -93,7 +99,8 @@ public class Quiz {
 			System.out.println(s.uname+" : "+s.IP);
 		}
 		System.out.println("Initial Session Complete. There are "+studentsList.size()+" students logged in\n");
-		System.exit(0);
+		System.exit(1);
+		System.out.println("Exited!!");
 	}
 	
 	public void receiveAuthPackets()
@@ -119,7 +126,7 @@ public class Quiz {
 		    	&& data_packet.probe_packet == false && data_packet.data!=null)
 		    {	
 		    	auth_packet = (AuthPacket)obj;
-		    	if( auth_packet.userName == null || auth_packet.grantAccess == true || auth_packet.password == null )
+		    	if( auth_packet.userName == null || auth_packet.password == null )
 		    	{
 		    		// Checks if the username, password are not null and also makes sure that client is not sending grantaccess as true
 		    		grantAccess(false,clientIP, Utilities.INVALID_FIELDS);
@@ -138,19 +145,26 @@ public class Quiz {
 		    System.out.println("Now checking in the Database for the client record...\n");
 		    if( verifyDetails(auth_packet.userName, auth_packet.password) == true)
 		    {
-		    	boolean flag = isPresent(auth_packet.userName);
-		    	System.out.println("flag is "+flag);
-		    	if(flag)
+		    	Student pres_stud = isPresent(auth_packet.userName);
+		    	if( pres_stud!=null )
 		    	{
-		    		System.out.println("User is already logged in..\n");
-		    		grantAccess(true, clientIP, Utilities.ALREADY_LOGGED);
-		    		// Error message will be sent
+		    		if( pres_stud.IP.equals(clientIP) )
+			    	{
+		    			System.out.println("ALREADY LOGGED SAME IP!");
+		    			grantAccess(true,clientIP, Utilities.NO_ERROR);
+		    			return;
+			    	}
+			    	else
+			    	{
+			    		System.out.println("ALREADY LOGGED!");
+			    		grantAccess(false, clientIP, Utilities.ALREADY_LOGGED);
+			    	}
 		    	}
 		    	else
 		    	{
 		    		System.out.println("User is valid...Granted access.. Now sending reply..\n");
 		    		grantAccess(true, clientIP, Utilities.NO_ERROR);
-		    		addStudent(pack.getAddress(),auth_packet.userName);
+		    		addStudent(clientIP,auth_packet.userName);
 		    	}
 		    }
 		    else
@@ -186,6 +200,7 @@ public class Quiz {
 		byte[] buf = Utilities.serialize(p);
 		DatagramPacket pack = new DatagramPacket(buf, buf.length, clientIP, Utilities.clientPort);
 		try {
+			sendSocket.send(pack);
 			sendSocket.send(pack);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -241,15 +256,16 @@ public class Quiz {
 			e.printStackTrace();
 		}
 	}
-	boolean isPresent(String name)
+	Student isPresent(String name)
 	{
 		for(int i=0;i<studentsList.size();i++)
 		{
-			if( studentsList.get(i).uname.equals(new String(name)) )
+			Student s = studentsList.get(i);
+			if( s.uname.equals(new String(name)))
 			{
-				return true;
+				return s;
 			}
 		}
-		return false;
+		return null;
 	}
 }
