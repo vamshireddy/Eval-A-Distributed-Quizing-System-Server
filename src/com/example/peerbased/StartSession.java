@@ -102,7 +102,7 @@ class StartSession {
 					noOfStudentsInGroup = Utilities.scan.nextByte();
 					quiz = new Quiz(noOfStudents,noOfGroups,noOfStudentsInGroup,subject,teacherName,date, databaseConnection);
 					// This initiates the quiz with the parameters specified above
-					quiz.start();
+					quiz.startQuizSession();
 					break;
 			case 3:	queryPerformance();
 					break;

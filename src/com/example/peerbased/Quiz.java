@@ -27,43 +27,69 @@ import javax.print.DocFlavor.STRING;
 
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
+import com.mysql.jdbc.Util;
 
-public class Quiz {	private static int port = Utilities.recvPort;
+public class Quiz extends Thread{	
+	
+	/* Classroom Parameters */
 	private byte noOfStudents;
 	private byte noOfGroups;
 	private byte noOfStudentsInGroup;
+	private ArrayList<Student> studentsList;
+	private ArrayList<ArrayList<Student>> groups;
+	
+	/* Teacher Parameters */
 	private String subject;
 	private String teacherName;
+	
+	/* Date and time of the quiz */
 	private Date date;
 	private String timeStamp;
-	private ArrayList<Student> studentsList;		// for all the students participating
-	private List[] groups;				// for all the groups for the session
-	private DatagramSocket sendSocket;  // Socket used for sending, which has ephemeral port number
-	private DatagramSocket recvSocket;  // Socket used for receiving 
-	private int currentSeqNo;
-	private Connection con;
-	private int localSeqNo;
+		
+	/* Network Parameters */
+	private DatagramSocket sendSocket;  
+	private DatagramSocket recvSocket;
 	private InetAddress broadcastIP;
 	
+	/* Sequence numbers of the packets */
+	private int currentSeqNo;
+	private int localSeqNo;
+	
+	/* Database Parameters */
+	private Connection con;
+
+	private boolean running = true;
+	
+	private InetAddress getBroadcastIP()
+	{
+		// To be filled
+		return null;
+	}
+	
+	
+	/* Constructor */
 	public Quiz(byte noOfStudents,byte noOfgroups,byte noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c)
 	{
+		/* Initialize the parameters which are passed from the previous class */
 		this.localSeqNo = 0;
 		this.con = c;
 		this.noOfGroups = noOfgroups;
 		this.noOfStudents = noOfStudents;
 		this.noOfStudentsInGroup = noOfStudentsInGroup;
 		this.teacherName = teacherName;
+		this.subject = subject;
 		this.studentsList = new ArrayList<Student>();
 		this.date = date;
 		timeStamp = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime());
+		this.groups = null;
+		
 		try {
-			
 			sendSocket = new DatagramSocket();
 			recvSocket = new DatagramSocket(null);
 			// Set the socket to reuse the address
 			recvSocket.setReuseAddress(true);
 			recvSocket.bind(new InetSocketAddress(Utilities.recvPort));
-			// Set the broadcast IP
+			// Set the broadcast IP, H
 			broadcastIP = InetAddress.getByName("192.168.1.255");
 			
 		} catch (SocketException e) {
@@ -73,19 +99,26 @@ public class Quiz {	private static int port = Utilities.recvPort;
 			e.printStackTrace();
 		}
 	}
-	public void start()
+	
+	/* This is the method which performs the crucial function of this class */
+	public void startQuizSession()
 	{
-		// This method is called when the teacher starts the quiz session
-		// Initial phase: Receive authentication packets from the 
-		System.out.println("There are "+noOfStudents+" No of students ");
+		/* This method is called whenever the teacher starts the quiz session
+		 * Initial phase: Receive authentication packets */
+		System.out.println("There are "+noOfStudents+" students ");
 		System.out.println("Students list count : "+studentsList.size());
-
-		while( studentsList.size() < noOfStudents )
+		
+		/* Spawn a new thread */
+		this.start();
+		
+		
+		System.out.println("Please enter 1 to stop ");
+		int input = Utilities.scan.nextInt();
+		if( input == 1 )
 		{
-			receiveAuthPackets();
+			this.shutdown();
+			System.out.println("Thead is shutdown, No more clients are received!");
 		}
-		
-		
 		
 		// Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
 		/*ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, studentsList);
@@ -94,7 +127,7 @@ public class Quiz {	private static int port = Utilities.recvPort;
 		sendDatagramPacket(sendSocket, ser_bytes, broadcastIP , Utilities.clientPort);
 		System.out.println("Sent Configuration Parameters to everyone in the network!");*/
 		
-		System.out.println("Initial Session Complete. There are "+studentsList.size()+" students logged in\n");
+		
 		for(int i=0;i<studentsList.size();i++)
 		{
 			Student s = studentsList.get(i);
@@ -128,7 +161,6 @@ public class Quiz {	private static int port = Utilities.recvPort;
 		    // Deserialize the data string to an appropriate object based on the flags present in the packet
 			//System.out.println("data is "+data_packet.data);
 		    Object obj = Utilities.deserialize(data_packet.data);
-	    	
 		    
 	    	AuthPacket auth_packet = null;
 	    	
@@ -136,14 +168,21 @@ public class Quiz {	private static int port = Utilities.recvPort;
 		    	&& data_packet.probe_packet == false && data_packet.data!=null)
 		    {	
 		    	auth_packet = (AuthPacket)obj;
-		    	if( auth_packet.userName.isEmpty() || auth_packet.password.isEmpty() )
+		    	/* 
+		    	 * TODO: 
+		    	 * 
+		    	 * Make sure that the userID and password which are sent from the client are not null. This is throwing an exception, as we are calling isEmpty() on it
+		    	 * 
+		    	 * 
+		    	 * if( auth_packet.userID.isEmpty() || auth_packet.password.isEmpty() )
+		    	 
 		    	{
 		    		// Checks if the username, password are not null and also makes sure that client is not sending grantaccess as true
 		    		grantAccess(false,clientIP, Utilities.INVALID_FIELDS);
 		    		return;
-		    	}
+		    	}*/
 		    	System.out.println("Authentication Request recieved from the Client\n" +
-		    			"Username: "+auth_packet.userName+" \nPassword : "+auth_packet.password+"\n");
+		    			"Username: "+auth_packet.userID+" \nPassword : "+auth_packet.password+"\n");
 		    }
 		    else
 		    {
@@ -153,9 +192,9 @@ public class Quiz {	private static int port = Utilities.recvPort;
 		    }
 		    
 		    System.out.println("Now checking in the Database for the client record...\n");
-		    if( verifyDetails(auth_packet.userName, auth_packet.password) == true)
+		    if( verifyDetails(auth_packet.userID, auth_packet.password) == true)
 		    {
-		    	Student pres_stud = isPresent(auth_packet.userName);
+		    	Student pres_stud = isPresent(auth_packet.userID);
 		    	if( pres_stud!=null )
 		    	{
 		    		if( pres_stud.IP.equals(clientIP) )
@@ -174,7 +213,7 @@ public class Quiz {	private static int port = Utilities.recvPort;
 		    	{
 		    		System.out.println("User is valid...Granted access.. Now sending reply..\n");
 		    		grantAccess(true, clientIP, Utilities.NO_ERROR);
-		    		addStudent(clientIP,auth_packet.userName);
+		    		addStudent(clientIP,auth_packet.userID);
 		    	}
 		    }
 		    else
@@ -185,7 +224,10 @@ public class Quiz {	private static int port = Utilities.recvPort;
 		}
 		catch (SocketException e)
 		{
-			e.printStackTrace();
+			if( running == true )
+			{
+				e.printStackTrace();
+			}
 		} 
 		catch (IOException e)
 		{
@@ -199,6 +241,9 @@ public class Quiz {	private static int port = Utilities.recvPort;
 		if( flag == false )
 		{
 			ap = new AuthPacket(true, flag, errorCode);
+			
+			/* TODO : Its hardcoded for now. Student name is to fetched from database later */
+			ap.studentName = "student";
 		}
 		else
 		{
@@ -238,7 +283,6 @@ public class Quiz {	private static int port = Utilities.recvPort;
 			if( result.next() )
 			{
 				// After getting the matched record from the database, we extract the Teacher name and subject name
-				System.out.println("TRUEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEe");
 				return true;
 			}
 			else
@@ -286,5 +330,21 @@ public class Quiz {	private static int port = Utilities.recvPort;
 			}
 		}
 		return null;
+	}
+	
+	public void run()
+	{
+		/* Receive the packets in a loop, untill all the students are logged in ( added to studentsList ) */
+		while( studentsList.size() < noOfStudents && running == true)
+		{
+			System.out.println("waiting!!!!\n");
+			receiveAuthPackets();
+		}
+		System.out.println("Initial Session Complete. There are "+studentsList.size()+" students logged in\n");
+	}
+	
+	public void shutdown()
+	{
+		running = false;
 	}
 }
