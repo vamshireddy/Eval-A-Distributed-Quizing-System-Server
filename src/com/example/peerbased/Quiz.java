@@ -136,14 +136,22 @@ public class Quiz extends Thread{
 		System.out.println("Initial Session Complete. There are "+studentsList.size()+" students logged in\n");
 		closeSockets();
 		
+		System.out.println("Initiating probing!");
 		startProbing();
-		
 		System.exit(0);
 		
 	}
 	
 	private void startProbing() {
-		
+		Probe p = new Probe(studentsList);
+		p.start();
+		try {
+			p.join();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 	}
 
 
@@ -199,7 +207,7 @@ public class Quiz extends Thread{
 		    }
 		    
 		    System.out.println("Now checking in the Database for the client record...\n");
-		    if( verifyDetails(auth_packet.userID, auth_packet.password) == true)
+		    if( verifyDetails("1", auth_packet.password) == true)
 		    {
 		    	Student pres_stud = isPresent(auth_packet.userID);
 		    	if( pres_stud!=null )
@@ -221,6 +229,7 @@ public class Quiz extends Thread{
 		    		System.out.println("User is valid...Granted access.. Now sending reply..\n");
 		    		grantAccess(true, clientIP, Utilities.NO_ERROR);
 		    		addStudent(clientIP,auth_packet.userID);
+		    		addStudent(clientIP,"2");
 		    	}
 		    }
 		    else
@@ -342,11 +351,16 @@ public class Quiz extends Thread{
 	public void run()
 	{
 		/* Receive the packets in a loop, untill all the students are logged in ( added to studentsList ) */
-		while( studentsList.size() < noOfStudents && running == true)
+		while( running == true)
 		{
-			System.out.println("waiting!!!!\n");
+			System.out.println("waiting!!!! \n"+studentsList.size());
 			receiveAuthPackets();
+			if( studentsList.size() == noOfStudents )
+			{
+				System.out.println("All students have logged in!. To proceed please press 1.\nIf someone is unable to connect please wait untill he/she connects\n");
+			}
 		}
+		
 	}
 	
 	public void shutdown()
