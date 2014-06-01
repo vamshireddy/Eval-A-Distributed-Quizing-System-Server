@@ -112,7 +112,7 @@ public class Quiz extends Thread{
 		this.start();
 		
 		
-		System.out.println("Please enter 1 to stop ");
+		System.out.println("ENTER 1 TO STOP\n");
 		int input = Utilities.scan.nextInt();
 		if( input == 1 )
 		{
@@ -134,12 +134,19 @@ public class Quiz extends Thread{
 			System.out.println(s.uname+" : "+s.IP);
 		}
 		System.out.println("Initial Session Complete. There are "+studentsList.size()+" students logged in\n");
-		sendSocket.close();
-		recvSocket.close();
+		closeSockets();
+		
+		startProbing();
+		
 		System.exit(0);
 		
 	}
 	
+	private void startProbing() {
+		
+	}
+
+
 	public void receiveAuthPackets()
 	{
 		try 
@@ -340,11 +347,16 @@ public class Quiz extends Thread{
 			System.out.println("waiting!!!!\n");
 			receiveAuthPackets();
 		}
-		System.out.println("Initial Session Complete. There are "+studentsList.size()+" students logged in\n");
 	}
 	
 	public void shutdown()
 	{
 		running = false;
+	}
+	
+	public void closeSockets()
+	{
+		sendSocket.close();
+		recvSocket.close();
 	}
 }

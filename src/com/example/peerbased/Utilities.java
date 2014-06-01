@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Scanner;
 
 
@@ -21,6 +23,10 @@ public class Utilities {
 	// Port numbers
 	public static int recvPort = 4444;
 	public static int clientPort = 5555;
+	public static int recvProbePort = 9989;
+	public static int clientProbePort = 9998;
+	// Addresses
+	public static InetAddress broadcastIP;
 	// Error codes
 	public static final byte NO_ERROR = 1;
 	public static final byte INVALID_USER_PASS = 2;
@@ -29,6 +35,16 @@ public class Utilities {
 	public static final byte INVALID_REQUEST = 5;
 	// Utility objects
 	public static Scanner scan = new Scanner(System.in);
+	
+	static
+	{
+		try {
+			broadcastIP = InetAddress.getByName("192.168.1.255");
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 	
 	public static Object deserialize(byte[] buffer)
 	{
