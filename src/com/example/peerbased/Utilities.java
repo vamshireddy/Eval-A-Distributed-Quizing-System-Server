@@ -21,10 +21,12 @@ public class Utilities {
 	private static ObjectOutputStream oos;
 
 	// Port numbers
-	public static int recvPort = 4444;
+	public static int servPort = 4444;
 	public static int clientPort = 5555;
-	public static int recvProbePort = 9989;
+	public static int servProbePort = 9989;
 	public static int clientProbePort = 9998;
+	public static int authServerPort = 9876;
+	public static int authClientPort = 6789;
 	// Addresses
 	public static InetAddress broadcastIP;
 	// Error codes

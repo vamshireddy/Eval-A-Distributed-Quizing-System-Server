@@ -18,8 +18,8 @@ public class Probe extends Thread{
 	
 	public Probe(ArrayList<Student> students)
 	{
-		studentsList = students;
-		serverProbePort = Utilities.recvProbePort;
+		studentsList = StudentListHandler.getList();
+		serverProbePort = Utilities.servProbePort;
 		clientProbePort = Utilities.clientProbePort;
 
 		try {

@@ -9,6 +9,7 @@ public class Packet implements Serializable{
 	boolean bcast;			// This flag will be set, if the packet is a broadcast packet . Usually set by the sender
 	boolean probe_packet;	// Used when the packet is used for probing the status of the android devices (students)
 	boolean param_packet;
+	boolean leader_req_packet;
 	byte[] data;			// This holds a serialized object of the class according to the flags set above.
 
 	private Packet()
@@ -20,6 +21,7 @@ public class Packet implements Serializable{
 		probe_packet = false;
 		data = null;
 		param_packet = false;
+		leader_req_packet = false;
 	}
 	public Packet(int seq_no, boolean auth, boolean bcast, boolean probe, byte[] data) {
 		this();

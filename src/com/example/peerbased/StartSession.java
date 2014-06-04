@@ -2,6 +2,10 @@ package com.example.peerbased;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter.DEFAULT;
+
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
 
@@ -14,6 +18,7 @@ class StartSession {
 	private Date date;				 // Login Date
 	private String subject;			 // Subject of the teacher
 	private Connection databaseConnection;	 // Database connection to the underlying mySQL database which contains the information about the teachers and students
+	private ArrayList<Student> studentsList;
 	
 	public boolean verifyDetails(String id, String password)
 	{
@@ -29,6 +34,7 @@ class StartSession {
 				// After getting the matched record from the database, we extract the Teacher name and subject name
 				teacherName = result.getString("teacher_name");
 				subject = result.getString("subject");
+				System.out.println("Subject is "+subject);
 				return true;
 			}
 			else
@@ -52,6 +58,7 @@ class StartSession {
 	{
 		date = new Date(0);
 		databaseConnection = db;
+		studentsList = StudentListHandler.getList();
 	}
 	
 	public void printWelcomeMessage()
@@ -61,6 +68,9 @@ class StartSession {
 	
 	public void start()
 	{
+		StudentLogin sl = new StudentLogin(databaseConnection);
+		sl.start();
+		
 		while(true)
 		{
 			System.out.println("Enter your userID and password: ");
@@ -70,21 +80,25 @@ class StartSession {
 			if( verifyDetails(teacherID,teacherPassword) )
 			{
 				printWelcomeMessage();
-				showOptions();
+				int retVal;
+				do
+				{
+					retVal = showOptions();
+				}
+				while( retVal!=-1 );
 				break;
 			}
 			else
 			{
 				System.out.println("Invalid userID or Password, Try again.");
-				continue;
 			}
 		}
 	}
 	
-	public void showOptions()
+	public int showOptions()
 	{
 		System.out.println("1.Configure Student Details\n2.Start a Quiz\n3.View Performance of student\n"+
-									"4.View Questions in Database\n5.Upload any Documents\n6.Exit");
+									"4.View Questions in Database\n5.Upload any Documents\n6.View Online Students\n7.Exit");
 		int choice = Utilities.scan.nextInt();
 		switch(choice)
 		{
@@ -94,13 +108,16 @@ class StartSession {
 					byte noOfStudents;
 					byte noOfGroups;
 					byte noOfStudentsInGroup;
+					byte noOfRounds;
 					System.out.println("No of students present in the class : ");
 					noOfStudents = Utilities.scan.nextByte();
 					System.out.println("No of Groups : ");
 					noOfGroups = Utilities.scan.nextByte();
 					System.out.println("No of students present in each group : ");
 					noOfStudentsInGroup = Utilities.scan.nextByte();
-					quiz = new Quiz(noOfStudents,noOfGroups,noOfStudentsInGroup,subject,teacherName,date, databaseConnection);
+					System.out.println("No of rounds : ");
+					noOfRounds = Utilities.scan.nextByte();
+					quiz = new Quiz(noOfStudents,noOfGroups,noOfStudentsInGroup,subject,teacherName,date, databaseConnection, noOfRounds);
 					// This initiates the quiz with the parameters specified above
 					quiz.startQuizSession();
 					break;
@@ -112,7 +129,22 @@ class StartSession {
 			case 5: // Upload Documents 
 					break;
 			case 6: // Exit
-					System.exit(0);
+					displayStudents();
+					break;
+			case 7: return -1;
+			
+		    default: return -1;
+		}
+		return 1;
+	}
+	
+	public void displayStudents()
+	{
+		System.out.println("These are the students who are logged in right now!");
+		for(int i=0;i<studentsList.size();i++)
+		{
+			Student s = studentsList.get(i);
+			System.out.println("uID : "+s.uID+" "+"IP : "+s.IP+" "+" Marks : "+s.marks);
 		}
 	}
 	

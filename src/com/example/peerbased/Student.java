@@ -4,15 +4,16 @@ import java.net.InetAddress;
 /* This student class is used to create a Student object for each session */
 class Student
 {
-	String uname;
+	String uID;
 	InetAddress IP;
+	String name;
 	int noOfQuestions;
 	int noOfAnswers;
 	int marks;
-	public Student( InetAddress IP, String uname )
+	public Student( InetAddress IP, String uID )
 	{
 		this.IP = IP;
-		this.uname = uname;
+		this.uID = uID;
 		noOfAnswers = 0;
 		noOfQuestions = 0;
 		marks = 0;

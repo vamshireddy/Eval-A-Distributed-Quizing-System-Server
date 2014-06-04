@@ -1,42 +1,30 @@
 package com.example.peerbased;
-import java.awt.List;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Time;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.net.*;
 
-import javax.jws.Oneway;
-import javax.print.DocFlavor.STRING;
 
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
-import com.mysql.jdbc.Util;
 
 public class Quiz extends Thread{	
-	
 	/* Classroom Parameters */
 	private byte noOfStudents;
 	private byte noOfGroups;
 	private byte noOfStudentsInGroup;
+	private byte noOfRounds;
 	private ArrayList<Student> studentsList;
-	private ArrayList<ArrayList<Student>> groups;
 	
 	/* Teacher Parameters */
 	private String subject;
@@ -52,7 +40,7 @@ public class Quiz extends Thread{
 	private InetAddress broadcastIP;
 	
 	/* Sequence numbers of the packets */
-	private int currentSeqNo;
+	//private int currentSeqNo;
 	private int localSeqNo;
 	
 	/* Database Parameters */
@@ -68,7 +56,7 @@ public class Quiz extends Thread{
 	
 	
 	/* Constructor */
-	public Quiz(byte noOfStudents,byte noOfgroups,byte noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c)
+	public Quiz(byte noOfStudents,byte noOfgroups,byte noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c, byte noOfrnds)
 	{
 		/* Initialize the parameters which are passed from the previous class */
 		this.localSeqNo = 0;
@@ -78,17 +66,19 @@ public class Quiz extends Thread{
 		this.noOfStudentsInGroup = noOfStudentsInGroup;
 		this.teacherName = teacherName;
 		this.subject = subject;
-		this.studentsList = new ArrayList<Student>();
+		this.noOfRounds = noOfrnds;
+		this.studentsList = StudentListHandler.getList();
+		// Set the student list hadler so that all classes can access it!
+		
 		this.date = date;
 		timeStamp = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime());
-		this.groups = null;
 		
 		try {
 			sendSocket = new DatagramSocket();
 			recvSocket = new DatagramSocket(null);
 			// Set the socket to reuse the address
 			recvSocket.setReuseAddress(true);
-			recvSocket.bind(new InetSocketAddress(Utilities.recvPort));
+			recvSocket.bind(new InetSocketAddress(Utilities.servPort));
 			// Set the broadcast IP, H
 			broadcastIP = InetAddress.getByName("192.168.1.255");
 			
@@ -103,43 +93,53 @@ public class Quiz extends Thread{
 	/* This is the method which performs the crucial function of this class */
 	public void startQuizSession()
 	{
-		/* This method is called whenever the teacher starts the quiz session
-		 * Initial phase: Receive authentication packets */
-		System.out.println("There are "+noOfStudents+" students ");
-		System.out.println("Students list count : "+studentsList.size());
-		
-		/* Spawn a new thread */
-		this.start();
-		
-		
-		System.out.println("ENTER 1 TO STOP\n");
-		int input = Utilities.scan.nextInt();
-		if( input == 1 )
+		while( studentsList.size() < noOfStudents )
 		{
-			this.shutdown();
-			System.out.println("Thead is shutdown, No more clients are received!");
+			System.out.println("Waiting for students to log in!");
+			try {
+				sleep(1000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
-		
-		// Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
-		/*ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, studentsList);
-		Packet packy = new Packet(seqno++, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
+		System.out.println("All the Students are logged in!. Press any integer to Proceed to the next phase\nAfter Pressing a button students interface will be changed to Quiz mode");
+		int a  =  Utilities.scan.nextInt();
+		//Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
+		ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, noOfRounds, subject);
+		Packet packy = new Packet(101010, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
 		byte[] ser_bytes = Utilities.serialize(packy);
-		sendDatagramPacket(sendSocket, ser_bytes, broadcastIP , Utilities.clientPort);
-		System.out.println("Sent Configuration Parameters to everyone in the network!");*/
-		
-		
-		for(int i=0;i<studentsList.size();i++)
-		{
-			Student s = studentsList.get(i);
-			System.out.println(s.uname+" : "+s.IP);
+		// Broadcast 3 times
+		InetAddress s=null;
+		try {
+			s = InetAddress.getByName("192.168.1.255");
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
-		System.out.println("Initial Session Complete. There are "+studentsList.size()+" students logged in\n");
-		closeSockets();
+		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
+		System.out.println("Sent Configuration Parameters to everyone in the network!");
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
+		System.out.println("Sent Configuration Parameters to everyone in the network!");
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
+		System.out.println("Sent Configuration Parameters to everyone in the network!");
 		
-		System.out.println("Initiating probing!");
-		startProbing();
-		System.exit(0);
+		//Start leader Session
 		
+		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, localSeqNo, noOfGroups);
+		ls.startLeaderSession();
 	}
 	
 	private void startProbing() {
@@ -151,7 +151,6 @@ public class Quiz extends Thread{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
 	}
 
 
@@ -183,19 +182,6 @@ public class Quiz extends Thread{
 		    	&& data_packet.probe_packet == false && data_packet.data!=null)
 		    {	
 		    	auth_packet = (AuthPacket)obj;
-		    	/* 
-		    	 * TODO: 
-		    	 * 
-		    	 * Make sure that the userID and password which are sent from the client are not null. This is throwing an exception, as we are calling isEmpty() on it
-		    	 * 
-		    	 * 
-		    	 * if( auth_packet.userID.isEmpty() || auth_packet.password.isEmpty() )
-		    	 
-		    	{
-		    		// Checks if the username, password are not null and also makes sure that client is not sending grantaccess as true
-		    		grantAccess(false,clientIP, Utilities.INVALID_FIELDS);
-		    		return;
-		    	}*/
 		    	System.out.println("Authentication Request recieved from the Client\n" +
 		    			"Username: "+auth_packet.userID+" \nPassword : "+auth_packet.password+"\n");
 		    }
@@ -205,9 +191,8 @@ public class Quiz extends Thread{
 		    	grantAccess(false,clientIP, Utilities.INVALID_REQUEST);
 		    	return;
 		    }
-		    
 		    System.out.println("Now checking in the Database for the client record...\n");
-		    if( verifyDetails("1", auth_packet.password) == true)
+		    if( verifyDetails(auth_packet.userID, auth_packet.password) == true)
 		    {
 		    	Student pres_stud = isPresent(auth_packet.userID);
 		    	if( pres_stud!=null )
@@ -229,7 +214,6 @@ public class Quiz extends Thread{
 		    		System.out.println("User is valid...Granted access.. Now sending reply..\n");
 		    		grantAccess(true, clientIP, Utilities.NO_ERROR);
 		    		addStudent(clientIP,auth_packet.userID);
-		    		addStudent(clientIP,"2");
 		    	}
 		    }
 		    else
@@ -259,6 +243,7 @@ public class Quiz extends Thread{
 			ap = new AuthPacket(true, flag, errorCode);
 			
 			/* TODO : Its hardcoded for now. Student name is to fetched from database later */
+			
 			ap.studentName = "student";
 		}
 		else
@@ -324,7 +309,6 @@ public class Quiz extends Thread{
 		studentsList.add(s);
 		System.out.println("Students list count : "+studentsList.size());
 	}
-	
 	void sendDatagramPacket(DatagramSocket sock, byte[] buff, InetAddress ip, int port)
 	{
 		DatagramPacket packet = new DatagramPacket(buff, buff.length, ip, port);
@@ -340,14 +324,13 @@ public class Quiz extends Thread{
 		for(int i=0;i<studentsList.size();i++)
 		{
 			Student s = studentsList.get(i);
-			if( s.uname.equals(new String(name)))
+			if( s.uID.equals(new String(name)))
 			{
 				return s;
 			}
 		}
 		return null;
 	}
-	
 	public void run()
 	{
 		/* Receive the packets in a loop, untill all the students are logged in ( added to studentsList ) */
@@ -362,15 +345,46 @@ public class Quiz extends Thread{
 		}
 		
 	}
-	
 	public void shutdown()
 	{
 		running = false;
 	}
-	
 	public void closeSockets()
 	{
 		sendSocket.close();
 		recvSocket.close();
+	}
+	
+	public void cleanServerBuffer()
+	{
+		try {
+			// 1 second
+			recvSocket.setSoTimeout(1000);
+		} catch (SocketException e1) {
+			e1.printStackTrace();
+		}
+		while(true)
+		{
+			byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
+			DatagramPacket p = new DatagramPacket(b, b.length);
+			try {
+				recvSocket.receive(p);
+			}
+			catch( SocketTimeoutException e1)
+			{
+				// This exception occurs when there are no packets for the specified timeout period.
+				// Buffer is clean!!
+				try {
+					recvSocket.setSoTimeout(0); // infinete timeout
+				} catch (SocketException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				return;
+			}
+			catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }
