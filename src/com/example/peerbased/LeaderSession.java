@@ -43,8 +43,9 @@ public class LeaderSession extends Thread{
 	private DatagramSocket sendSock;
 	private DatagramSocket recvSock;
 	private int leaderReqCount = 0;
+	private long time_limit;
 	
-	public LeaderSession(ArrayList<Student> sl, DatagramSocket ssocket, DatagramSocket rsocket,int seq, int nogrps)
+	public LeaderSession(ArrayList<Student> sl, DatagramSocket ssocket, DatagramSocket rsocket,int seq, int nogrps, long time)
 	{
 		sendSock = ssocket;
 		recvSock = rsocket;
@@ -52,6 +53,7 @@ public class LeaderSession extends Thread{
 		noOfGroups = nogrps;
 		//groups =  (ArrayList<Student>[])new ArrayList[noOfGroups];
 		leaderRequests = new ArrayList<String>();
+		time_limit = time;
 
 	}
 	public void startLeaderSession()
@@ -65,11 +67,10 @@ public class LeaderSession extends Thread{
 		}
 		while(true)
 		{
-			System.out.println("Set the TimeLimit : ");
-			long time_limit = Utilities.scan.nextLong();
 			new Interupter(time_limit).start();
 			runSession();
-			System.out.println("The Leader Request Session time has been completed \nPress 1 to repeat the leader session\nPress 2 to go ahead");
+			
+			System.out.println("The Leader Request Session time has been completed \nPress 2 to go ahead");
 			int choice = Utilities.scan.nextInt();
 			if( choice == 1 )
 			{
@@ -117,8 +118,11 @@ public class LeaderSession extends Thread{
 			
 			if( lp.granted == false )
 			{
-				addRequest(new String(lp.uID));
-				leaderReqCount++;
+				boolean flag = addRequest(new String(lp.uID));
+				if( flag == false)
+				{
+					leaderReqCount++;
+				}
 				grantRequest(p,lp,true, IPadd);
 			}
 			else
@@ -143,17 +147,18 @@ public class LeaderSession extends Thread{
 			e.printStackTrace();
 		}
 	}
-	public void addRequest(String s)
+	public boolean addRequest(String s)
 	{
 		for(int i=0;i<noOfGroups;i++)
 		{
 			if(leaderRequests.equals(s))
 			{
-				return;
+				return true;
 			}
 		}
 		System.out.println("User added!");
 		leaderRequests.add(s);
+		return false;
 	}
 	public void printLeaders()
 	{

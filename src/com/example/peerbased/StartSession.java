@@ -109,11 +109,11 @@ class StartSession {
 					byte noOfGroups;
 					byte noOfStudentsInGroup;
 					byte noOfRounds;
-					System.out.println("No of students present in the class : ");
+					System.out.println("No of students present in the class : ( 0-128 )");
 					noOfStudents = Utilities.scan.nextByte();
-					System.out.println("No of Groups : ");
+					System.out.println("No of Groups : (0-128) ");
 					noOfGroups = Utilities.scan.nextByte();
-					System.out.println("No of students present in each group : ");
+					System.out.println("No of students present in each group : (0-128) ");
 					noOfStudentsInGroup = Utilities.scan.nextByte();
 					System.out.println("No of rounds : ");
 					noOfRounds = Utilities.scan.nextByte();

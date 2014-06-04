@@ -103,8 +103,8 @@ public class Quiz extends Thread{
 				e.printStackTrace();
 			}
 		}
-		System.out.println("All the Students are logged in!. Press any integer to Proceed to the next phase\nAfter Pressing a button students interface will be changed to Quiz mode");
-		int a  =  Utilities.scan.nextInt();
+		System.out.println("All the Students are logged in!. Enter the time limit to process to leader request session");
+		long time_limit = Utilities.scan.nextLong();
 		//Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
 		ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, noOfRounds, subject);
 		Packet packy = new Packet(101010, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
@@ -135,10 +135,33 @@ public class Quiz extends Thread{
 		}
 		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
 		System.out.println("Sent Configuration Parameters to everyone in the network!");
-		
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
+		System.out.println("Sent Configuration Parameters to everyone in the network!");
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
+		System.out.println("Sent Configuration Parameters to everyone in the network!");
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
+		System.out.println("Sent Configuration Parameters to everyone in the network!");
 		//Start leader Session
-		
-		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, localSeqNo, noOfGroups);
+		cleanServerBuffer();
+		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, localSeqNo, noOfGroups, time_limit);
 		ls.startLeaderSession();
 	}
 	
