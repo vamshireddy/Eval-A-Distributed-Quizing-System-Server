@@ -1,6 +1,7 @@
 package com.example.peerbased;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -33,12 +34,23 @@ class Interupter extends Thread
 	}
 }
 
+class Leader implements Serializable
+{
+	public static final long serialVersionUID = 191249L;
+	String name;
+	String id;
+	public Leader(String name, String id)
+	{
+		this.name = name;
+		this.id = id;
+	}
+}
 
 public class LeaderSession extends Thread{
 	//private ArrayList<Student>[] groups;
 	public static boolean running = true;
 	ArrayList<Student> studentsList;
-    ArrayList<String> leaderRequests;
+    ArrayList<Leader> leaderRequests;
 	private int noOfGroups;
 	private DatagramSocket sendSock;
 	private DatagramSocket recvSock;
@@ -51,7 +63,7 @@ public class LeaderSession extends Thread{
 		recvSock = rsocket;
 		noOfGroups = nogrps;
 		//groups =  (ArrayList<Student>[])new ArrayList[noOfGroups];
-		leaderRequests = new ArrayList<String>();
+		leaderRequests = new ArrayList<Leader>();
 		time_limit = time;
 
 	}
@@ -83,34 +95,38 @@ public class LeaderSession extends Thread{
 		}
 		broadCastLeaders();
 		Utilities.cleanServerBuffer(recvSock);
-		
 	}
 	private void broadCastLeaders() {
 		
 		for( int i=0;i<leaderRequests.size();i++ )
 		{
-			String id = leaderRequests.get(i);
+			Leader l = leaderRequests.get(i);
 			for(int j=0;j<studentsList.size();j++)
 			{
-				if( studentsList.get(j).uID.equals(id) ) 
+				if( studentsList.get(j).uID.equals(l.id) ) 
 				{
+					// Add the leader name 
+					l.name = studentsList.get(j).name;
+		
 					Student s = studentsList.get(j);
 					sendLeaderMessage(s.IP);
+					System.out.println("Sent leader group request to "+s.name+"!!!");
 				}
 			}
 		}
 		for( int i=0;i<studentsList.size();i++ )
 		{
 			Student s = studentsList.get(i);
-			if( !leaderRequests.contains(s.uID) )
+			if( !leaderRequests.contains(new Leader(s.name, s.uID)) )
 			{
 				sendElectedLeaders(leaderRequests, s.IP);
+				System.out.println("Sent online Leaders to "+s.uID+"!!!");
 			}
 		}
 	}
 	
 
-	private void sendElectedLeaders(ArrayList<String> leaders, InetAddress IP) {
+	private void sendElectedLeaders(ArrayList<Leader> leaders, InetAddress IP) {
 		LeaderPacket lp = new LeaderPacket();
 		lp.selectedLeadersList = true;
 		lp.leaders = leaders;
@@ -183,7 +199,8 @@ public class LeaderSession extends Thread{
 				}
 				if( lp.granted == false )
 				{
-					addRequest(new String(lp.uID));
+					System.out.println("luid = "+lp.uID+" name : "+lp.uName);
+					addRequest(new Leader(lp.uName, lp.uID));
 					grantRequest(true, IPadd);
 				}
 				else
@@ -214,11 +231,11 @@ public class LeaderSession extends Thread{
 			e.printStackTrace();
 		}
 	}
-	public boolean addRequest(String s)
+	public boolean addRequest(Leader s)
 	{
 		for(int i=0;i<noOfGroups;i++)
 		{
-			if(leaderRequests.equals(s))
+			if(leaderRequests.contains(s))
 			{
 				return true;
 			}
@@ -234,7 +251,7 @@ public class LeaderSession extends Thread{
 			System.out.println("Leader UserID = "+leaderRequests.get(i));
 		}
 	}
-	public ArrayList<String> getLeaders()
+	public ArrayList<Leader> getLeaders()
 	{
 		return leaderRequests;
 	}

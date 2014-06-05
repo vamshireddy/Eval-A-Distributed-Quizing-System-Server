@@ -67,36 +67,37 @@ public class StudentLogin extends Thread{
 		    else
 		    {
 		    	// Send denyAccess to the client, so that the client would send the request again
-		    	grantAccess(false,clientIP, Utilities.INVALID_REQUEST);
+		    	grantAccess(false,clientIP, Utilities.INVALID_REQUEST, "");
 		    	return;
 		    }
 		    //System.out.println("Now checking in the Database for the client record...\n");
-		    if( verifyDetails(auth_packet.userID, auth_packet.password) == true)
+		    String studentName = verifyDetails(auth_packet.userID, auth_packet.password);
+		    if( studentName != null )
 		    {
 		    	Student pres_stud = isPresent(auth_packet.userID);
 		    	if( pres_stud!=null )
 		    	{
 		    		if( pres_stud.IP.equals(clientIP) )
 			    	{
-		    			grantAccess(true,clientIP, Utilities.NO_ERROR);
+		    			grantAccess(true,clientIP, Utilities.NO_ERROR, studentName);
 		    			return;
 			    	}
 			    	else
 			    	{
-			    		grantAccess(false, clientIP, Utilities.ALREADY_LOGGED);
+			    		grantAccess(false, clientIP, Utilities.ALREADY_LOGGED, studentName);
 			    	}
 		    	}
 		    	else
 		    	{
 		    		//System.out.println("User is valid...Granted access.. Now sending reply..\n");
-		    		grantAccess(true, clientIP, Utilities.NO_ERROR);
-		    		addStudent(clientIP,auth_packet.userID);
+		    		grantAccess(true, clientIP, Utilities.NO_ERROR, studentName);
+		    		addStudent(clientIP,auth_packet.userID, studentName);
 		    	}
 		    }
 		    else
 		    {
 		    	//System.out.println("Access denied!");
-		    	grantAccess(false,clientIP, Utilities.INVALID_USER_PASS);
+		    	grantAccess(false,clientIP, Utilities.INVALID_USER_PASS, studentName);
 		    }
 		}
 		catch (SocketException e)
@@ -109,16 +110,13 @@ public class StudentLogin extends Thread{
 		}
 	}
 	
-	private void grantAccess(boolean flag,InetAddress clientIP, byte errorCode)
+	private void grantAccess(boolean flag,InetAddress clientIP, byte errorCode, String name)
 	{
 		AuthPacket ap = null;
 		if( flag == false )
 		{
 			ap = new AuthPacket(true, flag, errorCode);
-			
-			/* TODO : Its hardcoded for now. Student name is to fetched from database later */
-			
-			ap.studentName = "student";
+			ap.studentName = name;
 		}
 		else
 		{
@@ -137,8 +135,9 @@ public class StudentLogin extends Thread{
 		}
 	}
 	
-	public boolean verifyDetails(String id, String password)
+	public String verifyDetails(String id, String password)
 	{
+		String name = null;
 		try {
 			// Prepare the statement to be executed on the database with the necessary query string
 			int id_int;
@@ -148,7 +147,7 @@ public class StudentLogin extends Thread{
 			}
 			catch( NumberFormatException e )
 			{
-				return false;
+				return null;
 			}
 			PreparedStatement p = (PreparedStatement)con.prepareStatement("select * from student_info where roll_number='"+id_int+
 																"' and password='"+password+"'");
@@ -158,12 +157,13 @@ public class StudentLogin extends Thread{
 			if( result.next() )
 			{
 				// After getting the matched record from the database, we extract the Teacher name and subject name
-				return true;
+				name = result.getString("name");
+				return name;
 			}
 			else
 			{
 				// UserID and Password doesn't exist in the database
-				return false;
+				return name;
 			}
 		} 
 		catch (SQLException e) 
@@ -173,22 +173,22 @@ public class StudentLogin extends Thread{
 		}
 		System.out.println("Error in the database query ");
 		System.exit(0);// included for completeness
-		return false;
+		return null;
 	}
 	
-	void addStudent(InetAddress ip, String uname)
+	void addStudent(InetAddress ip, String uid, String name)
 	{
 		// Add student to the list
-		Student s = new Student(ip, uname);
+		Student s = new Student(ip, uid, name);
 		studentsList.add(s);
 		//System.out.println("Students list count : "+studentsList.size());
 	}
-	Student isPresent(String name)
+	Student isPresent(String id)
 	{
 		for(int i=0;i<studentsList.size();i++)
 		{
 			Student s = studentsList.get(i);
-			if( s.uID.equals(new String(name)))
+			if( s.uID.equals(new String(id)))
 			{
 				return s;
 			}
