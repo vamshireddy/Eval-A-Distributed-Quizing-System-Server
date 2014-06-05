@@ -85,7 +85,7 @@ public class Utilities {
 		}
 		return Buf;
 	}
-	public void cleanServerBuffer(DatagramSocket s)
+	public static void cleanServerBuffer(DatagramSocket s)
 	{
 		try {
 			// 1 second

@@ -25,6 +25,7 @@ public class Quiz extends Thread{
 	private byte noOfStudentsInGroup;
 	private byte noOfRounds;
 	private ArrayList<Student> studentsList;
+	private ArrayList<String> leaderList;
 	
 	/* Teacher Parameters */
 	private String subject;
@@ -163,8 +164,14 @@ public class Quiz extends Thread{
 		cleanServerBuffer();
 		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, localSeqNo, noOfGroups, time_limit);
 		ls.startLeaderSession();
+		// Leader session ends
 	}
 	
+	private void formGroups() {
+		
+	}
+
+
 	private void startProbing() {
 		Probe p = new Probe(studentsList);
 		p.start();

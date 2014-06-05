@@ -37,19 +37,18 @@ class Interupter extends Thread
 public class LeaderSession extends Thread{
 	//private ArrayList<Student>[] groups;
 	public static boolean running = true;
-	private ArrayList<Student> studentsList;
-	private ArrayList<String> leaderRequests;
+	ArrayList<Student> studentsList;
+    ArrayList<String> leaderRequests;
 	private int noOfGroups;
 	private DatagramSocket sendSock;
 	private DatagramSocket recvSock;
-	private int leaderReqCount = 0;
 	private long time_limit;
 	
-	public LeaderSession(ArrayList<Student> sl, DatagramSocket ssocket, DatagramSocket rsocket,int seq, int nogrps, long time)
+	public LeaderSession(ArrayList<Student> students, DatagramSocket ssocket, DatagramSocket rsocket,int seq, int nogrps, long time)
 	{
+		studentsList = students;
 		sendSock = ssocket;
 		recvSock = rsocket;
-		studentsList = sl;
 		noOfGroups = nogrps;
 		//groups =  (ArrayList<Student>[])new ArrayList[noOfGroups];
 		leaderRequests = new ArrayList<String>();
@@ -82,8 +81,67 @@ public class LeaderSession extends Thread{
 				break;
 			}
 		}
+		broadCastLeaders();
+		Utilities.cleanServerBuffer(recvSock);
 		
 	}
+	private void broadCastLeaders() {
+		
+		for( int i=0;i<leaderRequests.size();i++ )
+		{
+			String id = leaderRequests.get(i);
+			for(int j=0;j<studentsList.size();j++)
+			{
+				if( studentsList.get(j).uID.equals(id) ) 
+				{
+					Student s = studentsList.get(j);
+					sendLeaderMessage(s.IP);
+				}
+			}
+		}
+		for( int i=0;i<studentsList.size();i++ )
+		{
+			Student s = studentsList.get(i);
+			if( !leaderRequests.contains(s.uID) )
+			{
+				sendElectedLeaders(leaderRequests, s.IP);
+			}
+		}
+	}
+	
+
+	private void sendElectedLeaders(ArrayList<String> leaders, InetAddress IP) {
+		LeaderPacket lp = new LeaderPacket();
+		lp.selectedLeadersList = true;
+		lp.leaders = leaders;
+		Packet p = new Packet(121441, false, false, false, Utilities.serialize(lp), false, true);
+		byte[] bytes = Utilities.serialize(p);
+		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, IP, Utilities.clientPort);
+		
+		try {
+			sendSock.send(pack);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	private void sendLeaderMessage(InetAddress iP){
+		
+		LeaderPacket lp = new LeaderPacket();
+		lp.grpNameRequest = true;
+		Packet p = new Packet(121221, false, false, false, Utilities.serialize(lp), false, true);
+		byte[] bytes = Utilities.serialize(p);
+		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, iP, Utilities.clientPort);
+		
+		try {
+			sendSock.send(pack);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	
 	public void runSession()
 	{
 		byte[] b;
@@ -98,7 +156,6 @@ public class LeaderSession extends Thread{
 				System.out.println("Timeout!");
 				continue;
 			}
-			System.out.println("Received a request!");
 			Packet p = (Packet)Utilities.deserialize(b);
 			if( p.leader_req_packet == true && p.seq_no == 111222 )
 			{
@@ -109,33 +166,43 @@ public class LeaderSession extends Thread{
 	}
 	public void addRequestAndSendReply(Packet p, InetAddress IPadd)
 	{
-			LeaderPacket lp = (LeaderPacket)Utilities.deserialize(p.data);
-			if( leaderReqCount >= noOfGroups )
-			{
-				grantRequest(p,lp,false, IPadd);
-				return;
-			}
+			LeaderPacket lp = (LeaderPacket)Utilities.deserialize(p.data);	
 			
-			if( lp.granted == false )
+			if( leaderRequests.contains(lp.uID) )
 			{
-				boolean flag = addRequest(new String(lp.uID));
-				if( flag == false)
-				{
-					leaderReqCount++;
-				}
-				grantRequest(p,lp,true, IPadd);
+				// If the student is present in the list, send him postive reply
+				grantRequest(true, IPadd);
+				return;
 			}
 			else
 			{
-				grantRequest(p,lp,false, IPadd);
+				if( leaderRequests.size() >= noOfGroups )
+				{
+					grantRequest(false, IPadd);
+					return;
+				}
+				if( lp.granted == false )
+				{
+					addRequest(new String(lp.uID));
+					grantRequest(true, IPadd);
+				}
+				else
+				{
+					grantRequest(false, IPadd);
+				}
 			}
 	}
 	
-	public void grantRequest(Packet p, LeaderPacket lp, boolean flag, InetAddress IP)
+	public void grantRequest(boolean flag, InetAddress IP)
 	{
+		LeaderPacket lp = new LeaderPacket();
 		lp.granted = flag;
-		p.data = Utilities.serialize(lp);
+		Packet p = new Packet(121441, false, false, false, Utilities.serialize(lp), false, true);
+		p.leader_req_packet = true;
+		
 		byte[] ba = Utilities.serialize(p);
+		
+		
 		DatagramPacket pack = new DatagramPacket(ba, ba.length, IP, Utilities.clientPort);
 		try
 		{
@@ -166,5 +233,9 @@ public class LeaderSession extends Thread{
 		{
 			System.out.println("Leader UserID = "+leaderRequests.get(i));
 		}
+	}
+	public ArrayList<String> getLeaders()
+	{
+		return leaderRequests;
 	}
 }
