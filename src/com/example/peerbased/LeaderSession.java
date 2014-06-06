@@ -51,6 +51,7 @@ public class LeaderSession extends Thread{
 	public static boolean running = true;
 	ArrayList<Student> studentsList;
     ArrayList<Leader> leaderRequests;
+    ArrayList<Group> groups;
 	private int noOfGroups;
 	private DatagramSocket sendSock;
 	private DatagramSocket recvSock;
@@ -93,15 +94,78 @@ public class LeaderSession extends Thread{
 				break;
 			}
 		}
+		groups = new ArrayList<Group>(noOfGroups);
+		
 		broadCastLeaders();
+		
 		Utilities.cleanServerBuffer(recvSock);
+		// Now receive the group name requests from leaders and the leader selection requests from the other students
+		
+		while( true )
+		{
+			byte[] b = new byte[Utilities.MAX_BUFFER_SIZE];
+			DatagramPacket pack  =  new DatagramPacket(b, b.length);
+			try
+			{
+				recvSock.receive(pack);
+			}
+			catch (IOException e)
+			{
+				// TODO Auto-generated catch block
+				System.out.println("Timeout!");
+				continue;
+			}
+			Packet p = (Packet)Utilities.deserialize(b);
+			if( p.leader_req_packet == true && p.seq_no == 121111 )
+			{
+				LeaderPacket lp = (LeaderPacket)Utilities.deserialize(p.data);
+				if( lp.grpNameRequest == true  )
+				{
+					// Add the group name
+					int gsize = groups.size();
+					for( int i=0;i<gsize;i++ )
+					{
+						Group g = groups.get(i);
+						if( g.leaderID.equals(lp.uID) )
+						{
+							g.groupName = lp.groupName;
+						}
+					}			
+				}
+				else if( lp.leaderSelection == true )
+				{
+					int gsize = groups.size();
+					for( int i=0;i<gsize;i++ )
+					{
+						Group g = groups.get(i);
+						if( g.leaderID.equals(lp.uID) )
+						{
+							for(int j=0;j<studentsList.size();j++)
+							{
+								Student s = studentsList.get(j);
+								if( s.uID.equals(lp.uID) )
+								{
+									g.teamMembers.add(s);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 	private void broadCastLeaders() {
+		/* 
+		 * This function broadcast's the leaders to the students( who are not leaders ) and sends a groupname request to leaders
+		 */
 		
-		for( int i=0;i<leaderRequests.size();i++ )
+		int lsize = leaderRequests.size();
+		int ssize = studentsList.size();
+		
+		for( int i=0;i<lsize;i++ )
 		{
 			Leader l = leaderRequests.get(i);
-			for(int j=0;j<studentsList.size();j++)
+			for(int j=0;j<ssize;j++)
 			{
 				if( studentsList.get(j).uID.equals(l.id) ) 
 				{
@@ -109,15 +173,30 @@ public class LeaderSession extends Thread{
 					l.name = studentsList.get(j).name;
 		
 					Student s = studentsList.get(j);
+					// Make a new group entry 
+					groups.add(new Group("",s.name, s.uID, s));
+					System.out.println("Added a group!");
+					
+					
 					sendLeaderMessage(s.IP);
 					System.out.println("Sent leader group request to "+s.name+"!!!");
 				}
 			}
 		}
-		for( int i=0;i<studentsList.size();i++ )
+		for( int i=0;i<ssize;i++ )
 		{
 			Student s = studentsList.get(i);
-			if( !leaderRequests.contains(new Leader(s.name, s.uID)) )
+			boolean flag = true;
+			for( int j=0;j<lsize;j++ )
+			{
+				Leader l = leaderRequests.get(j);
+				System.out.println("I am inside...........ids are "+s.uID+" "+l.id);
+				if(l.id.equals(s.uID))
+				{
+					flag = false;
+				}
+			} 
+			if( flag == true )
 			{
 				sendElectedLeaders(leaderRequests, s.IP);
 				System.out.println("Sent online Leaders to "+s.uID+"!!!");
@@ -127,9 +206,13 @@ public class LeaderSession extends Thread{
 	
 
 	private void sendElectedLeaders(ArrayList<Leader> leaders, InetAddress IP) {
+		/*
+		 * Send the leaders to everyone except the leader students
+		 */
 		LeaderPacket lp = new LeaderPacket();
-		lp.selectedLeadersList = true;
-		lp.leaders = leaders;
+		lp.LeadersListBroadcast = true; // This is flag to differentiate the list packet for non-leaders and group name selection packet for leaders
+		lp.leaders = leaders;			// Add the leaders
+		
 		Packet p = new Packet(121441, false, false, false, Utilities.serialize(lp), false, true);
 		byte[] bytes = Utilities.serialize(p);
 		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, IP, Utilities.clientPort);
