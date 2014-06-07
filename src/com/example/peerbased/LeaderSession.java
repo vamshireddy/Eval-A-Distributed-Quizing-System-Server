@@ -47,7 +47,6 @@ class Leader implements Serializable
 }
 
 public class LeaderSession extends Thread{
-	//private ArrayList<Student>[] groups;
 	public static boolean running = true;
 	ArrayList<Student> studentsList;
     ArrayList<Leader> leaderRequests;
@@ -98,9 +97,10 @@ public class LeaderSession extends Thread{
 		
 		broadCastLeaders();
 		
-		Utilities.cleanServerBuffer(recvSock);
+		System.out.println("I am here !!!!!!!!!!!!1");
 		// Now receive the group name requests from leaders and the leader selection requests from the other students
 		
+		int count = 0;
 		while( true )
 		{
 			byte[] b = new byte[Utilities.MAX_BUFFER_SIZE];
@@ -113,44 +113,69 @@ public class LeaderSession extends Thread{
 			{
 				// TODO Auto-generated catch block
 				System.out.println("Timeout!");
+				count++;
+				if( count == 50 )
+				{
+					break;
+				}
 				continue;
 			}
+			System.out.println("Got a packet outside!!!!");
 			Packet p = (Packet)Utilities.deserialize(b);
-			if( p.leader_req_packet == true && p.seq_no == 121111 )
+			if( p.group_name_selection_packet == true && p.seq_no == 321321321 )
 			{
-				LeaderPacket lp = (LeaderPacket)Utilities.deserialize(p.data);
-				if( lp.grpNameRequest == true  )
+				System.out.println("Got a packet!!!!");
+				GroupNameSelectionPacket gnsp = (GroupNameSelectionPacket)Utilities.deserialize(p.data);
+				
+				if( gnsp.accepted == false  )
 				{
+					System.out.println("Its group name request!!");
 					// Add the group name
 					int gsize = groups.size();
 					for( int i=0;i<gsize;i++ )
 					{
 						Group g = groups.get(i);
-						if( g.leaderID.equals(lp.uID) )
+						if( g.leaderID.equals(gnsp.studentID) )
 						{
-							g.groupName = lp.groupName;
+							g.groupName = gnsp.groupName;
 						}
 					}			
 				}
-				else if( lp.leaderSelection == true )
+			}
+			else if( p.team_selection_packet == true && p.seq_no == 321321123 )
+			{
+				TeamSelectPacket tsp = (TeamSelectPacket)Utilities.deserialize(p.data);
+				int gsize = groups.size();
+				for( int i=0;i<gsize;i++ )
 				{
-					int gsize = groups.size();
-					for( int i=0;i<gsize;i++ )
+					Group g = groups.get(i);
+					if( g.leaderID.equals(tsp.leaderID) )
 					{
-						Group g = groups.get(i);
-						if( g.leaderID.equals(lp.uID) )
+						for(int j=0;j<studentsList.size();j++)
 						{
-							for(int j=0;j<studentsList.size();j++)
+							Student s = studentsList.get(j);
+							if( s.uID.equals(tsp.ID) )
 							{
-								Student s = studentsList.get(j);
-								if( s.uID.equals(lp.uID) )
-								{
-									g.teamMembers.add(s);
-								}
+								g.teamMembers.add(s);
 							}
 						}
 					}
 				}
+			}
+			else
+			{
+				continue;
+			}
+		}
+		
+		System.out.println("The groups are : ");
+		for(int i=0;i<groups.size();i++)
+		{
+			Group g = groups.get(i);
+			System.out.println("\nLeader : "+g.leaderID+" GroupName: "+g.groupName);
+			for(int j=0;j<g.teamMembers.size();j++)
+			{
+				System.out.println("Student : "+g.teamMembers.get(j).name);
 			}
 		}
 	}
@@ -209,6 +234,7 @@ public class LeaderSession extends Thread{
 		/*
 		 * Send the leaders to everyone except the leader students
 		 */
+		// TODO can add strict check's at the client by sending the userName and ID. That will be validated at the client side
 		LeaderPacket lp = new LeaderPacket();
 		lp.LeadersListBroadcast = true; // This is flag to differentiate the list packet for non-leaders and group name selection packet for leaders
 		lp.leaders = leaders;			// Add the leaders
@@ -226,6 +252,7 @@ public class LeaderSession extends Thread{
 	}
 	private void sendLeaderMessage(InetAddress iP){
 		
+		// TODO can add strict check's at the client by sending the userName and ID. That will be validated at the client side
 		LeaderPacket lp = new LeaderPacket();
 		lp.grpNameRequest = true;
 		Packet p = new Packet(121221, false, false, false, Utilities.serialize(lp), false, true);

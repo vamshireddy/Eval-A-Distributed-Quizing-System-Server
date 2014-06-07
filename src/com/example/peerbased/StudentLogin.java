@@ -116,13 +116,12 @@ public class StudentLogin extends Thread{
 		if( flag == false )
 		{
 			ap = new AuthPacket(true, flag, errorCode);
-			ap.studentName = name;
 		}
 		else
 		{
 			ap = new AuthPacket(true, flag);
 		}
-		
+		ap.studentName = name;
 		Packet p = new Packet(localSeqNo,true,false,false,Utilities.serialize(ap));
 		
 		byte[] buf = Utilities.serialize(p);
