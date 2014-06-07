@@ -44,4 +44,11 @@ public class Packet implements Serializable{
 		this(seq_no, auth, bcast, probe, data, param_pack);
 		this.leader_req_packet = leader_pack;
 	}
+	public Packet(int seq_no, boolean auth, boolean bcast, boolean probe, byte[] data, boolean param_pack, boolean leader_pack, 
+				boolean team_Sel, boolean grp_name_req)
+	{
+		this(seq_no, auth, bcast, probe, data, param_pack, leader_pack);
+		team_selection_packet = team_Sel;
+		group_name_selection_packet = grp_name_req;
+	}
 }

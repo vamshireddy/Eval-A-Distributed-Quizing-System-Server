@@ -26,6 +26,7 @@ public class Quiz extends Thread{
 	private byte noOfRounds;
 	private ArrayList<Student> studentsList;
 	private ArrayList<String> leaderList;
+	private ArrayList<Group> groups;
 	
 	/* Teacher Parameters */
 	private String subject;
@@ -104,74 +105,41 @@ public class Quiz extends Thread{
 				e.printStackTrace();
 			}
 		}
-		System.out.println("All the Students are logged in!. Enter the time limit to process to leader request session");
-		long time_limit = Utilities.scan.nextLong();
+		System.out.println("All the Students are logged in!.\nEnter the time in seconds for the Leader Request Session");
+		long time_limit = Utilities.scan.nextLong()*1000;
+		System.out.println("Enter the duration of the group selection phase : ");
+		long grp_sel_time = Utilities.scan.nextLong();
 		//Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
+		
 		ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, noOfRounds, subject);
 		Packet packy = new Packet(101010, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
 		byte[] ser_bytes = Utilities.serialize(packy);
-		// Broadcast 3 times
-		InetAddress s=null;
-		try {
-			s = InetAddress.getByName("192.168.1.255");
-		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		
+		// Broadcast n times
+		System.out.println("Enter the desired reliability (0-10) for the broadcast packets which are about to be sent!");
+		int noOfBroadcastMessages = Utilities.scan.nextInt();
+		
+		for(int i=0;i<noOfBroadcastMessages;i++)
+		{
+			broadcastQuizStartMessageAndSleep(ser_bytes);
 		}
-		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
+		
 		System.out.println("Sent Configuration Parameters to everyone in the network!");
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
-		System.out.println("Sent Configuration Parameters to everyone in the network!");
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
-		System.out.println("Sent Configuration Parameters to everyone in the network!");
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
-		System.out.println("Sent Configuration Parameters to everyone in the network!");
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
-		System.out.println("Sent Configuration Parameters to everyone in the network!");
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		sendDatagramPacket(sendSocket, ser_bytes, s, Utilities.clientPort);
-		System.out.println("Sent Configuration Parameters to everyone in the network!");
+		
 		//Start leader Session
 		cleanServerBuffer();
-		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, localSeqNo, noOfGroups, time_limit);
+		/* Clean the server buffer before starting the leader session, so that all the previous unnecessary packets are discarded! */
+		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, localSeqNo, noOfGroups, time_limit, grp_sel_time, noOfStudentsInGroup);
 		ls.startLeaderSession();
 		// Leader session ends
 		cleanServerBuffer();
-	}
-	
-	private void formGroups() {
 		
+		/*
+		 * Get the data structure of groups from the leadersession object
+		 */
+		groups = ls.getGroups();
+		printGroups();
 	}
-
 
 	private void startProbing() {
 		Probe p = new Probe(studentsList);
@@ -183,7 +151,20 @@ public class Quiz extends Thread{
 			e.printStackTrace();
 		}
 	}
-
+	
+	private void printGroups()
+	{
+		System.out.println("The groups are : ");
+		for(int i=0;i<groups.size();i++)
+		{
+			Group g = groups.get(i);
+			System.out.println("\nLeader : "+g.leaderID+" GroupName: "+g.groupName);
+			for(int j=0;j<g.teamMembers.size();j++)
+			{
+				System.out.println("Student : "+g.teamMembers.get(j).name);
+			}
+		}
+	}
 
 	public void cleanServerBuffer()
 	{
@@ -202,8 +183,10 @@ public class Quiz extends Thread{
 			}
 			catch( SocketTimeoutException e1)
 			{
-				// This exception occurs when there are no packets for the specified timeout period.
-				// Buffer is clean!!
+				/*
+				 * This exception occurs when there are no packets for the specified timeout period.
+				 * Buffer is clean!!
+				 */
 				try {
 					recvSocket.setSoTimeout(0); // infinete timeout
 				} catch (SocketException e) {
@@ -223,6 +206,18 @@ public class Quiz extends Thread{
 		try {
 			sock.send(packet);
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	void broadcastQuizStartMessageAndSleep(byte[] ser_bytes)
+	{
+		sendDatagramPacket(sendSocket, ser_bytes, broadcastIP, Utilities.clientPort);
+		System.out.println("Sent Configuration Parameters to everyone in the network!");
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
