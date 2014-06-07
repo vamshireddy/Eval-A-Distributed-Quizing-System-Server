@@ -8,6 +8,8 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.ArrayList;
 
+import com.mysql.jdbc.Util;
+
 class Interupter extends Thread
 {
 	private long time;
@@ -51,6 +53,7 @@ public class LeaderSession extends Thread{
 	ArrayList<Student> studentsList;
     ArrayList<Leader> leaderRequests;
     ArrayList<Group> groups;
+    ArrayList<String> rcvdReqs;
 	private int noOfGroups;
 	private DatagramSocket sendSock;
 	private DatagramSocket recvSock;
@@ -62,9 +65,9 @@ public class LeaderSession extends Thread{
 		sendSock = ssocket;
 		recvSock = rsocket;
 		noOfGroups = nogrps;
-		//groups =  (ArrayList<Student>[])new ArrayList[noOfGroups];
 		leaderRequests = new ArrayList<Leader>();
 		time_limit = time;
+		rcvdReqs = new ArrayList<>();
 
 	}
 	public void startLeaderSession()
@@ -97,9 +100,10 @@ public class LeaderSession extends Thread{
 		
 		broadCastLeaders();
 		
-		System.out.println("I am here !!!!!!!!!!!!1");
+		System.out.println("Enter the duration of the group selection phase : ");
 		// Now receive the group name requests from leaders and the leader selection requests from the other students
 		
+		int timeoutSeconds = Utilities.scan.nextInt();
 		int count = 0;
 		while( true )
 		{
@@ -114,7 +118,7 @@ public class LeaderSession extends Thread{
 				// TODO Auto-generated catch block
 				System.out.println("Timeout!");
 				count++;
-				if( count == 50 )
+				if( count == timeoutSeconds )
 				{
 					break;
 				}
@@ -130,6 +134,11 @@ public class LeaderSession extends Thread{
 				if( gnsp.accepted == false  )
 				{
 					System.out.println("Its group name request!!");
+					// Check if the request has been already received
+					if( rcvdReqs.contains(gnsp.studentID) )
+					{
+						continue;
+					}
 					// Add the group name
 					int gsize = groups.size();
 					for( int i=0;i<gsize;i++ )
@@ -139,27 +148,36 @@ public class LeaderSession extends Thread{
 						{
 							g.groupName = gnsp.groupName;
 						}
-					}			
+					}
+					rcvdReqs.add(new String(gnsp.studentID));
 				}
 			}
 			else if( p.team_selection_packet == true && p.seq_no == 321321123 )
 			{
 				TeamSelectPacket tsp = (TeamSelectPacket)Utilities.deserialize(p.data);
-				int gsize = groups.size();
-				for( int i=0;i<gsize;i++ )
+				if( tsp.accepted == false )
 				{
-					Group g = groups.get(i);
-					if( g.leaderID.equals(tsp.leaderID) )
+					if( rcvdReqs.contains(tsp.ID) )
 					{
-						for(int j=0;j<studentsList.size();j++)
+						continue;
+					}
+					int gsize = groups.size();
+					for( int i=0;i<gsize;i++ )
+					{
+						Group g = groups.get(i);
+						if( g.leaderID.equals(tsp.leaderID) )
 						{
-							Student s = studentsList.get(j);
-							if( s.uID.equals(tsp.ID) )
+							for(int j=0;j<studentsList.size();j++)
 							{
-								g.teamMembers.add(s);
+								Student s = studentsList.get(j);
+								if( s.uID.equals(tsp.ID) )
+								{
+									g.teamMembers.add(s);
+								}
 							}
 						}
 					}
+					rcvdReqs.add(new String(tsp.ID));
 				}
 			}
 			else
