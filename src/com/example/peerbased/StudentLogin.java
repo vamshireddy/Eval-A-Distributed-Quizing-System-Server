@@ -15,20 +15,21 @@ import com.mysql.jdbc.PreparedStatement;
 
 public class StudentLogin extends Thread{
 	
-	DatagramSocket sock;
-	int localSeqNo = 0;
+	private DatagramSocket sock;
 	private Connection con;
 	private ArrayList<Student> studentsList;
 	
 	public StudentLogin(Connection databaseConnection) {
-		try {
+		try 
+		{
 			con = databaseConnection;
 			sock = new DatagramSocket(null);
 			// Set the socket to reuse the address
 			sock.setReuseAddress(true);
 			sock.bind(new InetSocketAddress(Utilities.authServerPort));
 			studentsList = StudentListHandler.getList();
-		} catch (SocketException e) {
+		} 
+		catch (SocketException e){
 			e.printStackTrace();
 		}
 	}
@@ -36,47 +37,44 @@ public class StudentLogin extends Thread{
 	{
 		try 
 		{
-			//System.out.println("Authent12\n");
-			// Allocate the buffer of MAX_BUFFER_SIZE, which is defined in the Utilities class
 		    byte[] buffer = new byte[Utilities.MAX_BUFFER_SIZE];
 		    DatagramPacket pack =  new DatagramPacket(buffer, buffer.length);
-		    // Wait for the client's auth packet
-			//System.out.println("Authentdsfffffffffffffff12\n");
 		    sock.receive(pack);
 		    
 		    InetAddress clientIP = pack.getAddress();
-		    // Deserialize the Packet object and store in the object 'p'
+		    
 		    Packet data_packet = (Packet)Utilities.deserialize(buffer);
-		    
-		    // Send the reply back by incrementing the seqno of the received packet
-		    localSeqNo = data_packet.seq_no+1;
-		    
-		    // Deserialize the data string to an appropriate object based on the flags present in the packet
-			//System.out.println("data is "+data_packet.data);
+
 		    Object obj = Utilities.deserialize(data_packet.data);
 		    
 	    	AuthPacket auth_packet = null;
 	    	
-		    if( data_packet.auth_packet == true && data_packet.bcast == false 
-		    	&& data_packet.probe_packet == false && data_packet.data!=null)
+		    if( data_packet.auth_packet == true && data_packet.seq_no == PacketSequenceNos.AUTHENTICATION_SEND_CLIENT )
 		    {	
 		    	auth_packet = (AuthPacket)obj;
-		    	//System.out.println("Authentication Request recieved from the Client\n" +
-		    		//	"Username: "+auth_packet.userID+" \nPassword : "+auth_packet.password+"\n");
 		    }
 		    else
 		    {
-		    	// Send denyAccess to the client, so that the client would send the request again
+		    	/*
+		    	 *  Send denyAccess to the client, so that the client would send the request again
+		    	 */
 		    	grantAccess(false,clientIP, Utilities.INVALID_REQUEST, "");
 		    	return;
 		    }
-		    //System.out.println("Now checking in the Database for the client record...\n");
+		    
 		    String studentName = verifyDetails(auth_packet.userID, auth_packet.password);
+		    
 		    if( studentName != null )
 		    {
+		    	/*
+		    	 * Student is authentic, Now check if the student's record has already been stored
+		    	 */
 		    	Student pres_stud = isPresent(auth_packet.userID);
-		    	if( pres_stud!=null )
+		    	if( pres_stud != null )
 		    	{
+		    		/*
+		    		 * Student record is already present in the students list.
+		    		 */
 		    		if( pres_stud.IP.equals(clientIP) )
 			    	{
 		    			grantAccess(true,clientIP, Utilities.NO_ERROR, studentName);
@@ -84,19 +82,27 @@ public class StudentLogin extends Thread{
 			    	}
 			    	else
 			    	{
+			    		/*
+			    		 * Student is logging in from different Tablet(IP)
+			    		 */
 			    		grantAccess(false, clientIP, Utilities.ALREADY_LOGGED, studentName);
 			    	}
 		    	}
 		    	else
 		    	{
-		    		//System.out.println("User is valid...Granted access.. Now sending reply..\n");
+		    		/*
+		    		 * Student request is new, Add an entry into the list, and send an ack to him
+		    		 */
 		    		grantAccess(true, clientIP, Utilities.NO_ERROR, studentName);
 		    		addStudent(clientIP,auth_packet.userID, studentName);
 		    	}
 		    }
 		    else
 		    {
-		    	//System.out.println("Access denied!");
+		    	/*
+		    	 * Entered credentials by the student didn't match with any of the records in the database
+		    	 * Send him -ve reply
+		    	 */
 		    	grantAccess(false,clientIP, Utilities.INVALID_USER_PASS, studentName);
 		    }
 		}
@@ -115,6 +121,9 @@ public class StudentLogin extends Thread{
 		AuthPacket ap = null;
 		if( flag == false )
 		{
+			/*
+			 * Use error code to convey the type of error
+			 */
 			ap = new AuthPacket(true, flag, errorCode);
 		}
 		else
@@ -122,10 +131,13 @@ public class StudentLogin extends Thread{
 			ap = new AuthPacket(true, flag);
 		}
 		ap.studentName = name;
-		Packet p = new Packet(localSeqNo,true,false,false,Utilities.serialize(ap));
+		
+		Packet p = new Packet(PacketSequenceNos.AUTHENTICATION_SEND_SERVER,true,false,false,Utilities.serialize(ap));
 		
 		byte[] buf = Utilities.serialize(p);
+		
 		DatagramPacket pack = new DatagramPacket(buf, buf.length, clientIP, Utilities.authClientPort);
+		
 		try {
 			sock.send(pack);
 		} catch (IOException e) {
@@ -142,6 +154,9 @@ public class StudentLogin extends Thread{
 			int id_int;
 			try
 			{
+				 /*
+				  * Check if the UID String is an Integer
+				  */
 				 id_int = Integer.parseInt(id);
 			}
 			catch( NumberFormatException e )
@@ -162,7 +177,7 @@ public class StudentLogin extends Thread{
 			else
 			{
 				// UserID and Password doesn't exist in the database
-				return name;
+				return null;
 			}
 		} 
 		catch (SQLException e) 
@@ -196,11 +211,10 @@ public class StudentLogin extends Thread{
 	}
 	public void run()
 	{
-		/* Receive the packets in a loop, untill all the students are logged in ( added to studentsList ) */
+		/* Authenticate the students */
 		while(true)
 		{
 			receiveAuthPackets();
 		}
-		
 	}
 }

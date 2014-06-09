@@ -3,74 +3,100 @@ import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter.DEFAULT;
-
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
 
 class StartSession {
-	//private final short port = 4444; // Constant port created for the Teacher to send/receive packets
-	private String teacherName;		 // Name which was entered in the login prompt by the teacher
-	private String teacherID;
+	
+	private String teacherName;		 // Name would be fetched from the database
+	private String teacherID;		 // ID will take the string which was entered by teacher in the login prompt
 	private String teacherPassword;  // Password which was entered in the login prompt by the teacher
-	private Quiz quiz;				 // Quiz reference variable to which an object would be created when the "Start Quiz" button is creating
-	private Date date;				 // Login Date
-	private String subject;			 // Subject of the teacher
-	private Connection databaseConnection;	 // Database connection to the underlying mySQL database which contains the information about the teachers and students
-	private ArrayList<Student> studentsList;
+	private Quiz quiz;				 // Placeholder for Quiz class object
+	private Date date;				 // Date at which the teacher logged into the system
+	private String subject;			 // Subject of the teacher fetched from database
+	private Connection databaseConnection;	 // Database connection to the underlying mySQL database
+	private ArrayList<Student> studentsList; // List of students who are connected during the session
+	private DatabaseQueries queryObject;
+	
+	public StartSession() {
+		teacherName = "default";
+		teacherID = "default";
+		teacherPassword = "default";
+		quiz = null;
+		date = null;
+		subject = "default";
+		databaseConnection = null;
+		studentsList = null;
+		queryObject = null;
+	}
+	
+	public StartSession(Connection db)
+	{
+		this();
+		date = new Date(0);
+		databaseConnection = db;
+		studentsList = StudentListHandler.getList();
+		/*
+		 * Create a database query class object
+		 */
+		queryObject = new DatabaseQueries(databaseConnection);
+		/*
+		 * Spawn a new thread for listening to the student authentication requests
+		 */
+		StudentLogin sl = new StudentLogin(databaseConnection);
+		sl.start();
+	}
 	
 	public boolean verifyDetails(String id, String password)
 	{
-		try {
-			// Prepare the statement to be executed on the database with the necessary query string
+		try 
+		{
+			/*
+			 *  Prepare the statement to be executed on the database with the necessary Query string
+			 */
 			PreparedStatement p = (PreparedStatement)databaseConnection.prepareStatement("select * from teacher where teacher_id='"+id+
 																"' and password='"+password+"'");
 			ResultSet result = p.executeQuery();
-			// result will initially point to the record before the 1st record. To access the 1st record, use result.next().
-			// If it returns null, then the teacher won't be authenticated with the given details
+			/*
+			 *  'result' will initially point to the record before the 1st record. To access the 1st record, use result.next().
+			 *   If it returns null, then the teacher won't be authenticated with the given details
+			 */
 			if( result.next() )
 			{
-				// After getting the matched record from the database, we extract the Teacher name and subject name
+				/*
+				 *  After getting the matched record from the database, Extract the Teacher name and subject name
+				 */
 				teacherName = result.getString("teacher_name");
 				subject = result.getString("subject");
-				System.out.println("Subject is "+subject);
 				return true;
 			}
 			else
 			{
-				// UserID and Password doesn't exist in the database
+				/*
+				 *  UserID and Password doesn't exist in the database
+				 */
 				return false;
 			}
 		} 
 		catch (SQLException e) 
 		{
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		System.out.println("Error in the database query ");
-		System.exit(0);// included for completeness
+		System.exit(0);
 		return false;
 	}
 	
 	// we pass the database name after creating a connection in the MainClass
-	public StartSession(Connection db)
-	{
-		date = new Date(0);
-		databaseConnection = db;
-		studentsList = StudentListHandler.getList();
-	}
+
 	
 	public void printWelcomeMessage()
 	{
-		System.out.println("Hello "+teacherName+",Have a nice time teaching "+subject);
+		System.out.println("Hello "+teacherName+", Have a Nice time teaching "+subject+" ! ");
 	}
 	
 	public void start()
-	{
-		StudentLogin sl = new StudentLogin(databaseConnection);
-		sl.start();
-		
+	{	
 		while(true)
 		{
 			System.out.println("Enter your userID and password: ");
@@ -80,6 +106,9 @@ class StartSession {
 			if( verifyDetails(teacherID,teacherPassword) )
 			{
 				printWelcomeMessage();
+				/*
+				 * For displaying the options multiple times
+				 */
 				int retVal;
 				do
 				{
@@ -111,6 +140,9 @@ class StartSession {
 					byte noOfRounds;
 					System.out.println("No of students present in the class : ( 0-128 )");
 					noOfStudents = Utilities.scan.nextByte();
+					/*
+					 * Tell the StudentLogin class about the number of students to wait for!
+					 */
 					System.out.println("No of Groups : (0-128) ");
 					noOfGroups = Utilities.scan.nextByte();
 					System.out.println("No of students present in each group : (0-128) ");
@@ -121,10 +153,9 @@ class StartSession {
 					// This initiates the quiz with the parameters specified above
 					quiz.startQuizSession();
 					break;
-			case 3:	queryPerformance();
+			case 3:	
 					break;
 			case 4: // This case needs to access student database ( Questions in database )
-					queryQuestions();
 					break;
 			case 5: // Upload Documents 
 					break;
@@ -144,17 +175,7 @@ class StartSession {
 		for(int i=0;i<studentsList.size();i++)
 		{
 			Student s = studentsList.get(i);
-			System.out.println("uID : "+s.uID+" "+"IP : "+s.IP+" "+" Marks : "+s.marks);
+			System.out.println("Name : "+s.name+" "+" IP : "+s.IP+" "+" ID : "+s.uID);
 		}
-	}
-	
-	public void queryPerformance()
-	{
-		
-	}
-	
-	public void queryQuestions()
-	{
-		
 	}
 }

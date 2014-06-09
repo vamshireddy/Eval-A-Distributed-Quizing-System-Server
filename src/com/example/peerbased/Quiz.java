@@ -7,8 +7,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.sql.Date;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -16,7 +14,6 @@ import java.net.*;
 
 
 import com.mysql.jdbc.Connection;
-import com.mysql.jdbc.PreparedStatement;
 
 public class Quiz extends Thread{	
 	/* Classroom Parameters */
@@ -41,10 +38,6 @@ public class Quiz extends Thread{
 	private DatagramSocket recvSocket;
 	private InetAddress broadcastIP;
 	
-	/* Sequence numbers of the packets */
-	//private int currentSeqNo;
-	private int localSeqNo;
-	
 	/* Database Parameters */
 	private Connection con;
 
@@ -52,6 +45,7 @@ public class Quiz extends Thread{
 	
 	private InetAddress getBroadcastIP()
 	{
+		/* Get it from the interface */
 		// To be filled
 		return null;
 	}
@@ -61,7 +55,6 @@ public class Quiz extends Thread{
 	public Quiz(byte noOfStudents,byte noOfgroups,byte noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c, byte noOfrnds)
 	{
 		/* Initialize the parameters which are passed from the previous class */
-		this.localSeqNo = 0;
 		this.con = c;
 		this.noOfGroups = noOfgroups;
 		this.noOfStudents = noOfStudents;
@@ -112,7 +105,7 @@ public class Quiz extends Thread{
 		//Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
 		
 		ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, noOfRounds, subject);
-		Packet packy = new Packet(101010, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
+		Packet packy = new Packet(PacketSequenceNos.QUIZ_START_BCAST_SERVER_SEND, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
 		byte[] ser_bytes = Utilities.serialize(packy);
 		
 		// Broadcast n times
@@ -129,7 +122,7 @@ public class Quiz extends Thread{
 		//Start leader Session
 		cleanServerBuffer();
 		/* Clean the server buffer before starting the leader session, so that all the previous unnecessary packets are discarded! */
-		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, localSeqNo, noOfGroups, time_limit, grp_sel_time, noOfStudentsInGroup);
+		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, noOfGroups, time_limit, grp_sel_time, noOfStudentsInGroup);
 		ls.startLeaderSession();
 		// Leader session ends
 		cleanServerBuffer();

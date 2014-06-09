@@ -8,7 +8,6 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.ArrayList;
 
-import com.mysql.jdbc.Util;
 
 class Interupter extends Thread
 {
@@ -38,6 +37,7 @@ class Interupter extends Thread
 
 class Leader implements Serializable
 {
+	/* This class is used for storing the leaders and publishing them to the non-leader students */
 	public static final long serialVersionUID = 191249L;
 	String name;
 	String id;
@@ -49,6 +49,7 @@ class Leader implements Serializable
 }
 
 public class LeaderSession extends Thread{
+	
 	public static boolean running = true;
 	ArrayList<Student> studentsList;
     ArrayList<Leader> leaderRequests;
@@ -61,8 +62,14 @@ public class LeaderSession extends Thread{
 	private long time_limit;
 	private long grp_sel_time_limit;
 	
-	public LeaderSession(ArrayList<Student> students, DatagramSocket ssocket, DatagramSocket rsocket,int seq, int nogrps, long time, long grptime,
-						byte grpSize)
+	public LeaderSession(
+			ArrayList<Student> students, 
+			DatagramSocket ssocket, 
+			DatagramSocket rsocket,
+			int nogrps,
+			long leaderTime,
+			long grpTime,
+			byte grpSize)
 	{
 		studentsList = students;
 		sendSock = ssocket;
@@ -70,9 +77,9 @@ public class LeaderSession extends Thread{
 		noOfGroups = nogrps;
 		groupSize = grpSize;
 		leaderRequests = new ArrayList<Leader>();
-		time_limit = time;
+		time_limit = leaderTime;
 		rcvdReqs = new ArrayList<>();
-		grp_sel_time_limit = grptime;
+		grp_sel_time_limit = grpTime;
 	}
 	
 	public void startLeaderSession()
@@ -135,7 +142,7 @@ public class LeaderSession extends Thread{
 			
 			System.out.println("Got a packet outside!!!!");
 			Packet p = (Packet)Utilities.deserialize(b);
-			if( p.group_name_selection_packet == true && p.seq_no == 321321321 )
+			if( p.group_name_selection_packet == true && p.seq_no == PacketSequenceNos.GROUP_REQ_CLIENT_SEND )
 			{
 				System.out.println("Got a packet!!!!");
 				GroupNameSelectionPacket gnsp = (GroupNameSelectionPacket)Utilities.deserialize(p.data);
@@ -149,6 +156,10 @@ public class LeaderSession extends Thread{
 					if( rcvdReqs.contains(gnsp.studentID) )
 					{
 						System.out.println("Redundant request!!");
+						/*
+						 * Send reply
+						 */
+						sendGroupSelectAck(true, gnsp.groupName, gnsp.studentName, gnsp.studentID, clientIP);
 						continue;
 					}
 					// Add the group name
@@ -162,9 +173,13 @@ public class LeaderSession extends Thread{
 						}
 					}
 					rcvdReqs.add(new String(gnsp.studentID));
+					/*
+					 * Send reply
+					 */
+					sendGroupSelectAck(true, gnsp.groupName, gnsp.studentName, gnsp.studentID, clientIP);
 				}
 			}
-			else if( p.team_selection_packet == true && p.seq_no == 321321123 )
+			else if( p.team_selection_packet == true && p.seq_no == PacketSequenceNos.TEAM_REQ_CLIENT_SEND )
 			{
 				TeamSelectPacket tsp = (TeamSelectPacket)Utilities.deserialize(p.data);
 				String clientName = tsp.name;
@@ -176,7 +191,7 @@ public class LeaderSession extends Thread{
 					/*
 					 * The tsp packet received from the student should always have accepted=false
 					 */
-					if( rcvdReqs.contains(clientID) )
+					if( rcvdReqs.contains(new String(clientID)) )
 					{
 						/*
 						 * Simply reject multiple requests from the same client.
@@ -197,7 +212,7 @@ public class LeaderSession extends Thread{
 								 * If the request is not valid, Dont add the student to the rcvdRequest list
 								 * This way he/she will be allowed to select other leader
 								 */
-								sendAck(false,clientIP, clientID, clientName, leaderID);
+								sendTeamSelectAck(false,clientIP, clientID, clientName, leaderID);
 								continue;
 							}
 							/*
@@ -214,7 +229,7 @@ public class LeaderSession extends Thread{
 									 * Add the student to the rcvdRequest list only if the student request is valid
 									 */
 									rcvdReqs.add(new String(clientID));
-									sendAck(true,clientIP, clientID, clientName, leaderID);
+									sendTeamSelectAck(true,clientIP, clientID, clientName, leaderID);
 									continue;
 								}
 							}
@@ -229,11 +244,27 @@ public class LeaderSession extends Thread{
 		}
 	}
 	
-	private void sendAck(boolean flag, InetAddress ip, String clientID, String clientName, String leaderID)
+	private void sendGroupSelectAck(boolean flag, String groupName, String uName, String uID, InetAddress ip)
+	{
+		GroupNameSelectionPacket gsp = new GroupNameSelectionPacket(groupName, uID, uName);
+		gsp.accepted = flag;
+		Packet p = new Packet(PacketSequenceNos.GROUP_REQ_SERVER_ACK, false, false, false, Utilities.serialize(gsp), false, false, true, false);
+		byte[] bytes = Utilities.serialize(p);
+		
+		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, ip, Utilities.clientPort);
+		try {
+			sendSock.send(pack);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private void sendTeamSelectAck(boolean flag, InetAddress ip, String clientID, String clientName, String leaderID)
 	{
 		TeamSelectPacket tsp = new TeamSelectPacket(leaderID, clientName, clientID);
 		tsp.accepted = flag;
-		Packet p = new Packet(12121212, false, false, false, Utilities.serialize(tsp), false, false, true, false);
+		Packet p = new Packet(PacketSequenceNos.TEAM_REQ_SERVER_ACK, false, false, false, Utilities.serialize(tsp), false, false, true, false);
 		byte[] bytes = Utilities.serialize(p);
 		
 		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, ip, Utilities.clientPort);
@@ -248,7 +279,7 @@ public class LeaderSession extends Thread{
 	private void broadCastLeaders()
 	{
 		/* 
-		 * This function broadcast's the leaders to the students( who are not leaders ) and sends a groupname request to leaders
+		 * This function broadcast's the leaders to the students ( who are not leaders ) and sends a groupname request to leaders
 		 */
 		int lsize = leaderRequests.size();
 		int ssize = studentsList.size();
@@ -305,13 +336,18 @@ public class LeaderSession extends Thread{
 		lp.LeadersListBroadcast = true; // This is flag to differentiate the list packet for non-leaders and group name selection packet for leaders
 		lp.leaders = leaders;			// Add the leaders
 		
-		Packet p = new Packet(121441, false, false, false, Utilities.serialize(lp), false, true);
+		Packet p = new Packet(PacketSequenceNos.SELECTED_LEADERS_SERVER_SEND, false, false, false, Utilities.serialize(lp), false, true);
 		byte[] bytes = Utilities.serialize(p);
 		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, IP, Utilities.clientPort);
 		
 		try {
 			sendSock.send(pack);
+			Thread.sleep(1000);
+			sendSock.send(pack);
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -322,13 +358,18 @@ public class LeaderSession extends Thread{
 		// TODO can add strict check's at the client by sending the userName and ID. That will be validated at the client side
 		LeaderPacket lp = new LeaderPacket();
 		lp.grpNameRequest = true;
-		Packet p = new Packet(121221, false, false, false, Utilities.serialize(lp), false, true);
+		Packet p = new Packet(PacketSequenceNos.GROUP_SERVER_SEND, false, false, false, Utilities.serialize(lp), false, true);
 		byte[] bytes = Utilities.serialize(p);
 		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, iP, Utilities.clientPort);
 		
 		try {
 			sendSock.send(pack);
+			Thread.sleep(1000);
+			sendSock.send(pack);
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -350,7 +391,7 @@ public class LeaderSession extends Thread{
 				continue;
 			}
 			Packet p = (Packet)Utilities.deserialize(b);
-			if( p.leader_req_packet == true && p.seq_no == 111222 )
+			if( p.leader_req_packet == true && p.seq_no == PacketSequenceNos.LEADER_REQ_CLIENT_SEND )
 			{
 				System.out.println("Received a request!");
 				addRequestAndSendReply(p, pack.getAddress());
@@ -361,7 +402,7 @@ public class LeaderSession extends Thread{
 	{
 			LeaderPacket lp = (LeaderPacket)Utilities.deserialize(p.data);	
 			
-			if( leaderRequests.contains(lp.uID) )
+			if( isPresentInLeaderReqs(lp.uID) )
 			{
 				// If the student is present in the list, send him postive reply
 				grantRequest(true, IPadd);
@@ -391,7 +432,7 @@ public class LeaderSession extends Thread{
 	{
 		LeaderPacket lp = new LeaderPacket();
 		lp.granted = flag;
-		Packet p = new Packet(121441, false, false, false, Utilities.serialize(lp), false, true);
+		Packet p = new Packet(PacketSequenceNos.LEADER_REQ_SERVER_SEND, false, false, false, Utilities.serialize(lp), false, true);
 		p.leader_req_packet = true;
 		
 		byte[] ba = Utilities.serialize(p);
@@ -428,6 +469,20 @@ public class LeaderSession extends Thread{
 			System.out.println("Leader UserID = "+leaderRequests.get(i));
 		}
 	}
+	
+	private boolean isPresentInLeaderReqs(String id)
+	{
+		for(int i=0;i<leaderRequests.size();i++)
+		{
+			Leader l = leaderRequests.get(i);
+			if( l.id.equals(id) )
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+	
 	public ArrayList<Leader> getLeaders()
 	{
 		return leaderRequests;

@@ -1,7 +1,5 @@
 package com.example.peerbased;
 import java.io.Serializable;
-import java.net.InetAddress;
-import java.util.ArrayList;
 
 // This is the format of the packet to be sent after the entire connection process is completed
 public class ParameterPacket implements Serializable {
