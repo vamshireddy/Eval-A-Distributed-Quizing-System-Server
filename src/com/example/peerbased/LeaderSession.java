@@ -26,12 +26,13 @@ class Interupter extends Thread
 	public void run()
 	{
 		try {
-			Thread.sleep(time);
+			Thread.sleep(10000);
+			LeaderSession.running = false;
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		LeaderSession.running = false;
+		
 	}
 }
 
@@ -248,8 +249,10 @@ public class LeaderSession extends Thread{
 	{
 		GroupNameSelectionPacket gsp = new GroupNameSelectionPacket(groupName, uID, uName);
 		gsp.accepted = flag;
-		Packet p = new Packet(PacketSequenceNos.GROUP_REQ_SERVER_ACK, false, false, false, Utilities.serialize(gsp), false, false, true, false);
+		Packet p = new Packet(PacketSequenceNos.GROUP_REQ_SERVER_ACK, false, false, false, Utilities.serialize(gsp), false, false, false, true);
 		byte[] bytes = Utilities.serialize(p);
+		
+		System.out.println("\nSENTTT\n");
 		
 		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, ip, Utilities.clientPort);
 		try {
@@ -292,9 +295,9 @@ public class LeaderSession extends Thread{
 				if( studentsList.get(j).uID.equals(l.id) ) 
 				{
 					// Add the leader name 
-					l.name = studentsList.get(j).name;
-		
 					Student s = studentsList.get(j);
+					l.name = s.name;
+		
 					// Make a new group entry 
 					groups.add(new Group("",s.name, s.uID, s));
 					System.out.println("Added a group!");

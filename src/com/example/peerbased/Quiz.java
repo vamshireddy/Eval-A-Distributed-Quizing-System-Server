@@ -10,8 +10,14 @@ import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Scanner;
 import java.net.*;
+import QuizPackets.*;
 
+import javax.swing.text.html.HTMLDocument.Iterator;
+
+
+import QuizPackets.QuizInterfacePacket;
 
 import com.mysql.jdbc.Connection;
 
@@ -24,6 +30,8 @@ public class Quiz extends Thread{
 	private ArrayList<Student> studentsList;
 	private ArrayList<String> leaderList;
 	private ArrayList<Group> groups;
+	private int questionTimelimitInSeconds;
+	private int AnswerTimeLimitInSeconds;
 	
 	/* Teacher Parameters */
 	private String subject;
@@ -76,7 +84,6 @@ public class Quiz extends Thread{
 			recvSocket.bind(new InetSocketAddress(Utilities.servPort));
 			// Set the broadcast IP, H
 			broadcastIP = InetAddress.getByName("192.168.1.255");
-			
 		} catch (SocketException e) {
 			e.printStackTrace();
 		} catch (UnknownHostException e) {
@@ -100,7 +107,7 @@ public class Quiz extends Thread{
 		}
 		System.out.println("All the Students are logged in!.\nEnter the time in seconds for the Leader Request Session");
 		long time_limit = Utilities.scan.nextLong()*1000;
-		System.out.println("Enter the duration of the group selection phase : ");
+		System.out.println("Enter the duration of the group selection phase in seconds : ");
 		long grp_sel_time = Utilities.scan.nextLong();
 		//Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
 		
@@ -132,8 +139,105 @@ public class Quiz extends Thread{
 		 */
 		groups = ls.getGroups();
 		printGroups();
+		
+		System.out.println("\nEnter any key to continue\n");
+		
+		int a = Utilities.scan.nextInt();
+		
+		sendGroupsToStudents(groups);
+		
+		startQuiz();
+		
+	}
+	
+	private void startQuiz()
+	{
+		/*
+		 * Quiz Starts here
+		 * Get the parameters required for Quiz.
+		 */
+		System.out.println("Enter the number of rounds : ");
+		noOfRounds = Utilities.scan.nextByte();
+		System.out.println("Enter the time for asking question: ");
+		questionTimelimitInSeconds = Utilities.scan.nextInt();
+		System.out.println("Enter the time for answering the question: ");
+		AnswerTimeLimitInSeconds = Utilities.scan.nextInt();
+		
+		/*
+		 * Clean the server buffer so that all the previous packets which are accumulated in the buffer are destroyed!
+		 */
+		System.out.println("Cleaning the server buffer\n");
+		cleanServerBuffer();
+		
+		for(int i=0;i<noOfRounds;i++)
+		{
+			for (int j=0;j<groups.size();j++)
+			{
+				sendInterfacePacketBCast(j);
+			}
+		}
+	}
+	
+	private void sendInterfacePacketBCast(int grpIndex)
+	{
+		/*
+		 * Make group 'g' as the active group and all others as passive 
+		 */
+		Group g = groups.get(grpIndex);
+		QuizInterfacePacket qip = new QuizInterfacePacket(g.groupName, g.leaderID);
 	}
 
+	private void sendGroupsToStudents(ArrayList<Group> grp)
+	{
+		for(int i=0;i<grp.size();i++)
+		{
+			Group g = grp.get(i);
+			System.out.println("\n\nGroup "+g.groupName);
+			ArrayList<Student> teammembers = g.teamMembers;
+			Student leader = g.leaderRecord;
+			sendToLeader(g.groupName, leader , teammembers);
+			sendToTeamMem(g.groupName, leader, teammembers);
+		}
+	}
+	
+	private void sendToLeader(String gname, Student leader, ArrayList<Student> team )
+	{
+		System.out.println("Sending to "+leader.name);
+		SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
+		Packet p = new Packet(PacketSequenceNos.FORMED_GROUP_SERVER_SEND, false, false, false, Utilities.serialize(sgp),
+				false, false, true, false);
+		byte[] bytes = Utilities.serialize(p);
+		
+		DatagramPacket dp = new DatagramPacket(bytes, bytes.length, leader.IP, Utilities.clientPort);
+		
+		try {
+			sendSocket.send(dp);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private void sendToTeamMem(String gname , Student leader, ArrayList<Student> team)
+	{
+		for(int i=0;i<team.size();i++)
+		{
+			Student stud = team.get(i);
+			SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
+			Packet p = new Packet(PacketSequenceNos.FORMED_GROUP_SERVER_SEND, false, false, false, Utilities.serialize(sgp),
+					false, false, true, false);
+			byte[] bytes = Utilities.serialize(p);
+			
+			DatagramPacket dp = new DatagramPacket(bytes, bytes.length, stud.IP, Utilities.clientPort);
+			try {
+				sendSocket.send(dp);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+	
 	private void startProbing() {
 		Probe p = new Probe(studentsList);
 		p.start();
@@ -196,7 +300,8 @@ public class Quiz extends Thread{
 	void sendDatagramPacket(DatagramSocket sock, byte[] buff, InetAddress ip, int port)
 	{
 		DatagramPacket packet = new DatagramPacket(buff, buff.length, ip, port);
-		try {
+		try
+		{
 			sock.send(packet);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

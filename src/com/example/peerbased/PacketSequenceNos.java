@@ -20,4 +20,6 @@ public class PacketSequenceNos {
 	public static final int GROUP_SERVER_SEND = 516;
 	
 	public static final int QUIZ_START_BCAST_SERVER_SEND = 1023;
+	
+	public static final int FORMED_GROUP_SERVER_SEND = 12319;
 }

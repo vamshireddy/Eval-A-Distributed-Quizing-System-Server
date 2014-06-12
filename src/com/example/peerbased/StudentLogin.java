@@ -39,6 +39,7 @@ public class StudentLogin extends Thread{
 		{
 		    byte[] buffer = new byte[Utilities.MAX_BUFFER_SIZE];
 		    DatagramPacket pack =  new DatagramPacket(buffer, buffer.length);
+		    
 		    sock.receive(pack);
 		    
 		    InetAddress clientIP = pack.getAddress();
@@ -52,6 +53,7 @@ public class StudentLogin extends Thread{
 		    if( data_packet.auth_packet == true && data_packet.seq_no == PacketSequenceNos.AUTHENTICATION_SEND_CLIENT )
 		    {	
 		    	auth_packet = (AuthPacket)obj;
+		    	System.out.println("Name : "+auth_packet.studentName+" Uid : "+auth_packet.userID+" pass : "+auth_packet.password);
 		    }
 		    else
 		    {

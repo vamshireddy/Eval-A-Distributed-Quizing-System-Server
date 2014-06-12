@@ -30,6 +30,7 @@ public class Utilities {
 	public static int clientProbePort = 9998;
 	public static int authServerPort = 9876;
 	public static int authClientPort = 6789;
+	public static int clientErrorPort = 9999;
 	// Addresses
 	public static InetAddress broadcastIP;
 	// Error codes

@@ -1,4 +1,9 @@
 package com.example.peerbased;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -178,4 +183,10 @@ class StartSession {
 			System.out.println("Name : "+s.name+" "+" IP : "+s.IP+" "+" ID : "+s.uID);
 		}
 	}
+	
+	@Override
+	protected void finalize() throws Throwable {
+		System.exit(0);
+	}
+	
 }

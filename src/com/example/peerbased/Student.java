@@ -1,9 +1,11 @@
 package com.example.peerbased;
+import java.io.Serializable;
 import java.net.InetAddress;
 
 /* This student class is used to create a Student object for each session */
-class Student
+class Student implements Serializable
 {
+	static final long serialVersionUID = 4212L;
 	String uID;
 	InetAddress IP;
 	String name;
