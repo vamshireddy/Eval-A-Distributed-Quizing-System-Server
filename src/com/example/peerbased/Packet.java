@@ -12,6 +12,7 @@ public class Packet implements Serializable{
 	boolean leader_req_packet;
 	boolean team_selection_packet;
 	boolean group_name_selection_packet;
+	boolean quizPacket;
 	byte[] data;			// This holds a serialized object of the class according to the flags set above.
 
 	private Packet()

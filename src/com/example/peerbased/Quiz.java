@@ -36,6 +36,7 @@ public class Quiz extends Thread{
 	/* Teacher Parameters */
 	private String subject;
 	private String teacherName;
+	private String standard;
 	
 	/* Date and time of the quiz */
 	private Date date;
@@ -48,6 +49,10 @@ public class Quiz extends Thread{
 	
 	/* Database Parameters */
 	private Connection con;
+	/*
+	 * Question array
+	 */
+	private ArrayList<Question> questions;
 
 	private boolean running = true;
 	
@@ -60,7 +65,8 @@ public class Quiz extends Thread{
 	
 	
 	/* Constructor */
-	public Quiz(byte noOfStudents,byte noOfgroups,byte noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c, byte noOfrnds)
+	public Quiz(byte noOfStudents,byte noOfgroups,byte noOfStudentsInGroup,String subject,String teacherName,Date date, Connection c, byte noOfrnds,
+				String standard)
 	{
 		/* Initialize the parameters which are passed from the previous class */
 		this.con = c;
@@ -71,6 +77,8 @@ public class Quiz extends Thread{
 		this.subject = subject;
 		this.noOfRounds = noOfrnds;
 		this.studentsList = StudentListHandler.getList();
+		this.questions = new ArrayList<>();
+		this.standard = standard;
 		// Set the student list hadler so that all classes can access it!
 		
 		this.date = date;
@@ -113,7 +121,6 @@ public class Quiz extends Thread{
 		
 		ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, noOfRounds, subject);
 		Packet packy = new Packet(PacketSequenceNos.QUIZ_START_BCAST_SERVER_SEND, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
-		byte[] ser_bytes = Utilities.serialize(packy);
 		
 		// Broadcast n times
 		System.out.println("Enter the desired reliability (0-10) for the broadcast packets which are about to be sent!");
@@ -121,7 +128,7 @@ public class Quiz extends Thread{
 		
 		for(int i=0;i<noOfBroadcastMessages;i++)
 		{
-			broadcastQuizStartMessageAndSleep(ser_bytes);
+			broadcastQuizStartMessageAndSleep(packy);
 		}
 		
 		System.out.println("Sent Configuration Parameters to everyone in the network!");
@@ -143,6 +150,13 @@ public class Quiz extends Thread{
 		System.out.println("\nEnter any key to continue\n");
 		
 		int a = Utilities.scan.nextInt();
+		
+		try {
+			recvSocket.setSoTimeout(1000);
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 		sendGroupsToStudents(groups);
 		
@@ -169,13 +183,228 @@ public class Quiz extends Thread{
 		System.out.println("Cleaning the server buffer\n");
 		cleanServerBuffer();
 		
+		int questionSeqNo = 1234;
+		
 		for(int i=0;i<noOfRounds;i++)
 		{
+			/*
+			 * Rounds
+			 */
 			for (int j=0;j<groups.size();j++)
 			{
+				/*
+				 * Turns
+				 */
 				sendInterfacePacketBCast(j);
+				/*
+				 * Now receive the questions from active group
+				 */
+				// Start the timer for question session
+				String answer = receiveAndSendQuestions(questionSeqNo);
+				if( answer == null )
+				{
+					/*
+					 * No question is formed, make next group as active
+					 */
+					continue;
+				}
+				ArrayList<String> answeredStuds = getResponses(questionSeqNo, answer);
+				calculateMarks(answeredStuds);
+				questionSeqNo++;
 			}
 		}
+	}
+	
+	private void calculateMarks(ArrayList<String> studs)
+	{
+		for(int i=0;i<studentsList.size();i++)
+		{
+			boolean flag = false;
+			Student s = studentsList.get(i);
+			for(int j=0;j<studs.size();j++)
+			{
+				if( s.name.equals(studs.get(i)) )
+				{
+					flag = true;
+					s.noOfAnswers++;
+					s.marks = s.marks + 2;
+					s.noOfQuestions++;
+					break;
+				}
+			}
+			if( flag == false )
+			{
+				s.noOfQuestions++;
+			}
+		}
+	}
+	
+	private ArrayList<String> getResponses(int qseq_no, String answer)
+	{
+		ArrayList<String> answeredStudIDs = new ArrayList<>();
+		int count = 0;
+		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
+		DatagramPacket p = new DatagramPacket(b, b.length);
+		
+		while( true )
+		{
+			try {
+				recvSocket.receive(p);
+			}
+			catch( SocketTimeoutException e )
+			{
+				count++;
+				if( count >= AnswerTimeLimitInSeconds )
+				{
+					break;
+				}
+				continue;
+			}
+			catch (IOException e) {
+				break;
+			}
+			/*
+			 * Response is received
+			 */
+			InetAddress clientIP = p.getAddress();
+			Packet packy = (Packet)Utilities.deserialize(b);
+			if( packy.seq_no == PacketSequenceNos.QUIZ_RESPONSE_CLIENT_SEND && packy.quizPacket == true )
+			{
+				ResponsePacket rp = (ResponsePacket)Utilities.deserialize(packy.data);
+				if( rp.questionSequenceNo == qseq_no )
+				{
+					if( rp.answer.equals(answer) )
+					{
+						/*
+						 * Add student ID to the list
+						 */
+						answeredStudIDs.add(rp.uID);
+						/* 
+						 * Send ack to the response
+						 */
+						sendResponseAck( clientIP, rp );
+					}
+					else
+					{
+						sendResponseAck( clientIP, rp );
+					}
+				}
+			}
+		}
+		return answeredStudIDs;
+	}
+	
+	private void sendResponseAck(InetAddress ip, ResponsePacket rp)
+	{
+		rp.ack = true;
+		Packet p = new Packet(PacketSequenceNos.QUIZ_RESPONSE_SERVER_ACK, false, false, false, Utilities.serialize(rp));
+		sendDatagramPacket(sendSocket, ip, Utilities.clientPort, p);
+	}
+	
+	private String receiveAndSendQuestions(int qseq_no)
+	{
+		int count = 0;
+		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
+		DatagramPacket p = new DatagramPacket(b, b.length);
+		
+		while( true )
+		{
+			try {
+				recvSocket.receive(p);
+			}
+			catch( SocketTimeoutException e )
+			{
+				count++;
+				if( count >= questionTimelimitInSeconds )
+				{
+					break;
+				}
+				continue;
+			}
+			catch (IOException e) {
+				break;
+			}
+			/*
+			 * Question is received
+			 */
+			InetAddress clientIP = p.getAddress();
+			Packet packy = (Packet)Utilities.deserialize(b);
+			if( packy.seq_no == PacketSequenceNos.QUIZ_QUESTION_PACKET_CLIENT_SEND && packy.quizPacket == true )
+			{
+				QuestionPacket qp = (QuestionPacket)Utilities.deserialize(packy.data);
+				
+				if( qp.questionAuthenticated == false )
+				{
+					if( qp.questionType == 1 )
+					{
+						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
+						for(int i=0;i<4;i++)
+						{
+							System.out.print(qp.options[i]);
+						}
+						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
+					}
+					else if( qp.questionType == 2 )
+					{
+						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
+						for(int i=0;i<2;i++)
+						{
+							System.out.print(qp.options[i]);
+						}
+						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
+					}
+					else if( qp.questionType == 3 )
+					{
+						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
+						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
+					}
+					
+					System.out.println("Is the question valid ? Press 1 for accepting it, 2 for rejecting it");
+					int a = Utilities.scan.nextInt();
+					
+					if( a==1 )
+					{
+						/*
+						 * Send him positive reply saying that his question is selected
+						 */
+						qp.questionAuthenticated = true;
+						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(qp));
+						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
+						/*
+						 * Now teacher enters the level of the question
+						 */
+						System.out.println("Enter the level of the question : ");
+						byte level = Utilities.scan.nextByte();
+						questions.add(new Question(qp.question, qp.correctAnswerOption, subject, level, standard));
+						/*
+						 * Copy the level to the packet
+						 */
+						qp.level = level;
+						/*
+						 * Send question to everyone
+						 */
+						qp.questionAuthenticated = true;
+						/*
+						 * Use the sequence number for each new question so that the previous packets can be ignored
+						 */
+						qp.questionSeqNo = qseq_no;
+						qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_BROADCAST_SERVER_SEND, false, false, false, Utilities.serialize(qp));
+						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+						return qp.correctAnswerOption;
+					}
+					else if( a==2 )
+					{
+						/*
+						 * Send reject packet
+						 */
+						qp.questionAuthenticated = false;
+						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(qp));
+						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
+					}
+				}
+			}
+		}
+		return null;
 	}
 	
 	private void sendInterfacePacketBCast(int grpIndex)
@@ -185,6 +414,15 @@ public class Quiz extends Thread{
 		 */
 		Group g = groups.get(grpIndex);
 		QuizInterfacePacket qip = new QuizInterfacePacket(g.groupName, g.leaderID);
+		
+		Packet pack = new Packet(PacketSequenceNos.QUIZ_INTERFACE_PACKET_SERVER_SEND, false, true, false, Utilities.serialize(g));
+		pack.quizPacket = true;
+		
+		/*
+		 *  Send the packet
+		 */
+		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
+		
 	}
 
 	private void sendGroupsToStudents(ArrayList<Group> grp)
@@ -297,8 +535,9 @@ public class Quiz extends Thread{
 			}
 		}
 	}
-	void sendDatagramPacket(DatagramSocket sock, byte[] buff, InetAddress ip, int port)
+	void sendDatagramPacket(DatagramSocket sock,InetAddress ip, int port, Packet p)
 	{
+		byte[] buff = Utilities.serialize(p);
 		DatagramPacket packet = new DatagramPacket(buff, buff.length, ip, port);
 		try
 		{
@@ -309,12 +548,12 @@ public class Quiz extends Thread{
 		}
 	}
 	
-	void broadcastQuizStartMessageAndSleep(byte[] ser_bytes)
+	void broadcastQuizStartMessageAndSleep(Packet p)
 	{
-		sendDatagramPacket(sendSocket, ser_bytes, broadcastIP, Utilities.clientPort);
+		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, p);
 		System.out.println("Sent Configuration Parameters to everyone in the network!");
 		try {
-			Thread.sleep(1000);
+			Thread.sleep(500);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

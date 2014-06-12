@@ -22,6 +22,7 @@ class StartSession {
 	private Connection databaseConnection;	 // Database connection to the underlying mySQL database
 	private ArrayList<Student> studentsList; // List of students who are connected during the session
 	private DatabaseQueries queryObject;
+	private String standard;
 	
 	public StartSession() {
 		teacherName = "default";
@@ -33,6 +34,7 @@ class StartSession {
 		databaseConnection = null;
 		studentsList = null;
 		queryObject = null;
+		standard = "";
 	}
 	
 	public StartSession(Connection db)
@@ -143,6 +145,8 @@ class StartSession {
 					byte noOfGroups;
 					byte noOfStudentsInGroup;
 					byte noOfRounds;
+					System.out.println("Which standard are you teaching : ");
+					standard =  Utilities.scan.nextLine();
 					System.out.println("No of students present in the class : ( 0-128 )");
 					noOfStudents = Utilities.scan.nextByte();
 					/*
@@ -154,7 +158,7 @@ class StartSession {
 					noOfStudentsInGroup = Utilities.scan.nextByte();
 					System.out.println("No of rounds : ");
 					noOfRounds = Utilities.scan.nextByte();
-					quiz = new Quiz(noOfStudents,noOfGroups,noOfStudentsInGroup,subject,teacherName,date, databaseConnection, noOfRounds);
+					quiz = new Quiz(noOfStudents,noOfGroups,noOfStudentsInGroup,subject,teacherName,date, databaseConnection, noOfRounds,standard);
 					// This initiates the quiz with the parameters specified above
 					quiz.startQuizSession();
 					break;
