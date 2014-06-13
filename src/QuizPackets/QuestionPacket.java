@@ -3,6 +3,7 @@ package QuizPackets;
 import java.io.Serializable;
 
 public class QuestionPacket implements Serializable{
+	public static final long serialVersionUID = 191L;
 	public int questionSeqNo;
 	public String groupName;
 	public byte questionType;

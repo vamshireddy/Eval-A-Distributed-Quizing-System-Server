@@ -3,6 +3,7 @@ import java.io.Serializable;
 import java.sql.Date;
 
 public class Question implements Serializable {
+	public static final long serialVersionUID = 19L;
 	public String question;
 	public String answer;
 	public Date date;

@@ -195,12 +195,14 @@ public class Quiz extends Thread{
 				/*
 				 * Turns
 				 */
+				System.out.println("Sending the packet to the group !!");
 				sendInterfacePacketBCast(j);
 				/*
 				 * Now receive the questions from active group
 				 */
 				// Start the timer for question session
 				String answer = receiveAndSendQuestions(questionSeqNo);
+				System.out.println("\nRecvd question!!\n");
 				if( answer == null )
 				{
 					/*
@@ -250,13 +252,17 @@ public class Quiz extends Thread{
 		while( true )
 		{
 			try {
+				System.out.println("\nWaiting fro responses!!!!!!!!!!!!\n");
 				recvSocket.receive(p);
+				System.out.println("\nGot response!!!!!!!!!!!!\n");
 			}
 			catch( SocketTimeoutException e )
 			{
 				count++;
+				System.out.println("timeout!");
 				if( count >= AnswerTimeLimitInSeconds )
 				{
+					System.out.println("done!");
 					break;
 				}
 				continue;
@@ -371,7 +377,19 @@ public class Quiz extends Thread{
 						 */
 						qp.questionAuthenticated = true;
 						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(qp));
-						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
+						qpack.quizPacket = true;
+						
+						byte bytes[] = Utilities.serialize(qpack);
+						DatagramPacket dp = new DatagramPacket(bytes, bytes.length, clientIP, Utilities.clientPort);
+						 
+						try {
+							sendSocket.send(dp);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						
+						System.out.println("Question sent to group \""+qp.groupName+"\" leader!");
 						/*
 						 * Now teacher enters the level of the question
 						 */
@@ -389,8 +407,13 @@ public class Quiz extends Thread{
 						/*
 						 * Use the sequence number for each new question so that the previous packets can be ignored
 						 */
+						/*
+						 * Ack leader who sent the question
+						 */
 						qp.questionSeqNo = qseq_no;
+						
 						qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_BROADCAST_SERVER_SEND, false, false, false, Utilities.serialize(qp));
+						qpack.quizPacket = true;
 						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
 						return qp.correctAnswerOption;
 					}
@@ -401,6 +424,7 @@ public class Quiz extends Thread{
 						 */
 						qp.questionAuthenticated = false;
 						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(qp));
+						qpack.quizPacket = true;
 						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
 					}
 				}
@@ -417,7 +441,7 @@ public class Quiz extends Thread{
 		Group g = groups.get(grpIndex);
 		QuizInterfacePacket qip = new QuizInterfacePacket(g.groupName, g.leaderID);
 		
-		Packet pack = new Packet(PacketSequenceNos.QUIZ_INTERFACE_PACKET_SERVER_SEND, false, true, false, Utilities.serialize(g));
+		Packet pack = new Packet(PacketSequenceNos.QUIZ_INTERFACE_PACKET_SERVER_SEND, false, true, false, Utilities.serialize(qip));
 		pack.quizPacket = true;
 		
 		/*
@@ -584,7 +608,8 @@ public class Quiz extends Thread{
 		System.out.println("Sent Configuration Parameters to everyone in the network!");
 		try {
 			Thread.sleep(500);
-		} catch (InterruptedException e) {
+		}
+		catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
