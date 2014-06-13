@@ -211,6 +211,7 @@ public class Quiz extends Thread{
 				ArrayList<String> answeredStuds = getResponses(questionSeqNo, answer);
 				calculateMarks(answeredStuds);
 				questionSeqNo++;
+				cleanBuffer();
 			}
 		}
 	}
@@ -282,11 +283,11 @@ public class Quiz extends Thread{
 						/* 
 						 * Send ack to the response
 						 */
-						sendResponseAck( clientIP, rp );
+						sendResponseAck( true, clientIP, rp );
 					}
 					else
 					{
-						sendResponseAck( clientIP, rp );
+						sendResponseAck( false , clientIP, rp );
 					}
 				}
 			}
@@ -294,9 +295,10 @@ public class Quiz extends Thread{
 		return answeredStudIDs;
 	}
 	
-	private void sendResponseAck(InetAddress ip, ResponsePacket rp)
+	private void sendResponseAck(boolean res, InetAddress ip, ResponsePacket rp)
 	{
 		rp.ack = true;
+		rp.result = res;
 		Packet p = new Packet(PacketSequenceNos.QUIZ_RESPONSE_SERVER_ACK, false, false, false, Utilities.serialize(rp));
 		sendDatagramPacket(sendSocket, ip, Utilities.clientPort, p);
 	}
@@ -501,6 +503,34 @@ public class Quiz extends Thread{
 		}
 	}
 
+	public void cleanBuffer()
+	{
+		try {
+			// 1 second
+			recvSocket.setSoTimeout(1000);
+		} catch (SocketException e1) {
+			e1.printStackTrace();
+		}
+		while(true)
+		{
+			byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
+			DatagramPacket p = new DatagramPacket(b, b.length);
+			try {
+				recvSocket.receive(p);
+			}
+			catch( SocketTimeoutException e1)
+			{
+				/*
+				 * This exception occurs when there are no packets for the specified timeout period.
+				 * Buffer is clean!!
+				 */
+			}
+			catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
 	public void cleanServerBuffer()
 	{
 		try {

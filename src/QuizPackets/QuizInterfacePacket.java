@@ -1,6 +1,8 @@
 package QuizPackets;
 
-public class QuizInterfacePacket {
+import java.io.Serializable;
+
+public class QuizInterfacePacket implements Serializable{
 	
 	public String activeGroupName;
 	public String activeGroupLeaderID;

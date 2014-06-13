@@ -1,6 +1,8 @@
 package QuizPackets;
 
-public class QuestionPacket {
+import java.io.Serializable;
+
+public class QuestionPacket implements Serializable{
 	public int questionSeqNo;
 	public String groupName;
 	public byte questionType;
