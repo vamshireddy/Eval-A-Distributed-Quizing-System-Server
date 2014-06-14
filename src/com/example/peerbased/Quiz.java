@@ -208,6 +208,7 @@ public class Quiz extends Thread{
 					/*
 					 * No question is formed, make next group as active
 					 */
+					System.out.println("OMG!!!!!!!!!!!!!!!!!!!!!!!!11");
 					continue;
 				}
 				ArrayList<String> answeredStuds = getResponses(questionSeqNo, answer);
@@ -249,6 +250,16 @@ public class Quiz extends Thread{
 		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
 		DatagramPacket p = new DatagramPacket(b, b.length);
 		
+		/*
+		 * Set socket timeout for timer
+		 */
+		try {
+			recvSocket.setSoTimeout(1000);
+		} catch (SocketException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
 		while( true )
 		{
 			try {
@@ -275,16 +286,21 @@ public class Quiz extends Thread{
 			 */
 			InetAddress clientIP = p.getAddress();
 			Packet packy = (Packet)Utilities.deserialize(b);
-			if( packy.seq_no == PacketSequenceNos.QUIZ_RESPONSE_CLIENT_SEND && packy.quizPacket == true )
+			System.out.println("Pack : "+packy.seq_no+" qp : "+packy.quizPacket);
+			if( packy.seq_no == PacketSequenceNos.QUIZ_RESPONSE_CLIENT_SEND)
 			{
+				System.out.println("packet seqno correct and its a quiz packet!!!");
 				ResponsePacket rp = (ResponsePacket)Utilities.deserialize(packy.data);
 				if( rp.questionSequenceNo == qseq_no )
 				{
+					System.out.println("question Seqno correct!!!");
+					System.out.println("Ans : "+answer+" rp.ans: "+rp.answer);
 					if( rp.answer.equals(answer) )
 					{
 						/*
 						 * Add student ID to the list
 						 */
+						System.out.println("answer is correct!!!");
 						answeredStudIDs.add(rp.uID);
 						/* 
 						 * Send ack to the response
@@ -293,9 +309,18 @@ public class Quiz extends Thread{
 					}
 					else
 					{
+						System.out.println("answer is wrong!!!");
 						sendResponseAck( false , clientIP, rp );
 					}
 				}
+				else
+				{
+					continue;
+				}
+			}
+			else
+			{
+				continue;
 			}
 		}
 		return answeredStudIDs;
@@ -303,9 +328,11 @@ public class Quiz extends Thread{
 	
 	private void sendResponseAck(boolean res, InetAddress ip, ResponsePacket rp)
 	{
+		System.out.println("Sent packkkky!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 		rp.ack = true;
 		rp.result = res;
 		Packet p = new Packet(PacketSequenceNos.QUIZ_RESPONSE_SERVER_ACK, false, false, false, Utilities.serialize(rp));
+		p.quizPacket = true;
 		sendDatagramPacket(sendSocket, ip, Utilities.clientPort, p);
 	}
 	
@@ -417,6 +444,13 @@ public class Quiz extends Thread{
 						qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_BROADCAST_SERVER_SEND, false, false, false, Utilities.serialize(qp));
 						qpack.quizPacket = true;
 						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
 						return qp.correctAnswerOption;
 					}
 					else if( a==2 )
@@ -449,6 +483,13 @@ public class Quiz extends Thread{
 		/*
 		 *  Send the packet
 		 */
+		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
 		
 	}
