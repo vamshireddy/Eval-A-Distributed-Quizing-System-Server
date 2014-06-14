@@ -375,12 +375,14 @@ public class Quiz extends Thread{
 						/*
 						 * Send him positive reply saying that his question is selected
 						 */
-						qp.questionAuthenticated = true;
-						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(qp));
+						QuestionPacket quesPack = new QuestionPacket(qp.groupName, (byte)2);
+						quesPack.questionAuthenticated = true;
+						
+						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(quesPack));
 						qpack.quizPacket = true;
 						
-						byte bytes[] = Utilities.serialize(qpack);
-						DatagramPacket dp = new DatagramPacket(bytes, bytes.length, clientIP, Utilities.clientPort);
+						byte byt[] = Utilities.serialize(qpack);
+						DatagramPacket dp = new DatagramPacket(byt, byt.length, clientIP, Utilities.clientPort);
 						 
 						try {
 							sendSocket.send(dp);
