@@ -212,6 +212,11 @@ public class Quiz extends Thread{
 					continue;
 				}
 				ArrayList<String> answeredStuds = getResponses(questionSeqNo, answer);
+				System.out.println("These student answered\n");
+				for(int k=0;k<answeredStuds.size();k++)
+				{
+					System.out.println(""+answeredStuds.get(i));
+				}
 				calculateMarks(answeredStuds);
 				questionSeqNo++;
 				cleanBuffer();
@@ -227,7 +232,7 @@ public class Quiz extends Thread{
 			Student s = studentsList.get(i);
 			for(int j=0;j<studs.size();j++)
 			{
-				if( s.name.equals(studs.get(i)) )
+				if( s.uID.equals(studs.get(j)) )
 				{
 					flag = true;
 					s.noOfAnswers++;
@@ -240,6 +245,11 @@ public class Quiz extends Thread{
 			{
 				s.noOfQuestions++;
 			}
+		}
+		for(int i=0;i<studentsList.size();i++)
+		{
+			Student s = studentsList.get(i);
+			System.out.println("Student name : "+s.name+"  Marks : "+s.marks+" Attempted : "+s.noOfQuestions+" Answered correct :"+s.noOfAnswers);
 		}
 	}
 	
@@ -287,7 +297,7 @@ public class Quiz extends Thread{
 			InetAddress clientIP = p.getAddress();
 			Packet packy = (Packet)Utilities.deserialize(b);
 			System.out.println("Pack : "+packy.seq_no+" qp : "+packy.quizPacket);
-			if( packy.seq_no == PacketSequenceNos.QUIZ_RESPONSE_CLIENT_SEND)
+			if( packy.seq_no == PacketSequenceNos.QUIZ_RESPONSE_CLIENT_SEND && packy.quizPacket == true)
 			{
 				System.out.println("packet seqno correct and its a quiz packet!!!");
 				ResponsePacket rp = (ResponsePacket)Utilities.deserialize(packy.data);
