@@ -461,6 +461,13 @@ public class Quiz extends Thread{
 							e.printStackTrace();
 						}
 						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
 						return qp.correctAnswerOption;
 					}
 					else if( a==2 )
