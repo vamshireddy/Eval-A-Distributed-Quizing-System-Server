@@ -195,7 +195,7 @@ public class Quiz extends Thread{
 				/*
 				 * Turns
 				 */
-				System.out.println("Sending the packet to the group !!");
+				System.out.println("Sending the quiz start packet to the group "+j+" ! ");
 				sendInterfacePacketBCast(j);
 				/*
 				 * Now receive the questions from active group
@@ -212,20 +212,16 @@ public class Quiz extends Thread{
 					continue;
 				}
 				ArrayList<String> answeredStuds = getResponses(questionSeqNo, answer);
-				System.out.println("These student answered\n");
-				for(int k=0;k<answeredStuds.size();k++)
-				{
-					System.out.println(""+answeredStuds.get(i));
-				}
-				calculateMarks(answeredStuds);
+				calculateMarks(answeredStuds, groups, j);
 				questionSeqNo++;
 				cleanBuffer();
 			}
 		}
 	}
 	
-	private void calculateMarks(ArrayList<String> studs)
-	{
+	private void calculateMarks(ArrayList<String> studs, ArrayList<Group> grps, int index)
+	{	
+		
 		for(int i=0;i<studentsList.size();i++)
 		{
 			boolean flag = false;
@@ -260,9 +256,6 @@ public class Quiz extends Thread{
 		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
 		DatagramPacket p = new DatagramPacket(b, b.length);
 		
-		/*
-		 * Set socket timeout for timer
-		 */
 		try {
 			recvSocket.setSoTimeout(1000);
 		} catch (SocketException e1) {
@@ -289,14 +282,17 @@ public class Quiz extends Thread{
 				continue;
 			}
 			catch (IOException e) {
-				break;
+				e.printStackTrace();
+				System.exit(0);
 			}
 			/*
 			 * Response is received
 			 */
 			InetAddress clientIP = p.getAddress();
 			Packet packy = (Packet)Utilities.deserialize(b);
+			
 			System.out.println("Pack : "+packy.seq_no+" qp : "+packy.quizPacket);
+			
 			if( packy.seq_no == PacketSequenceNos.QUIZ_RESPONSE_CLIENT_SEND && packy.quizPacket == true)
 			{
 				System.out.println("packet seqno correct and its a quiz packet!!!");
@@ -311,15 +307,20 @@ public class Quiz extends Thread{
 						 * Add student ID to the list
 						 */
 						System.out.println("answer is correct!!!");
-						answeredStudIDs.add(rp.uID);
-						/* 
+						if( !answeredStudIDs.contains(rp.uID) )
+						{
+							/*
+							 * redundant
+							 */
+							answeredStudIDs.add(rp.uID);
+						}
+						/* 	answeredStudIDs.add(rp.uID);
 						 * Send ack to the response
 						 */
 						sendResponseAck( true, clientIP, rp );
 					}
 					else
 					{
-						System.out.println("answer is wrong!!!");
 						sendResponseAck( false , clientIP, rp );
 					}
 				}
@@ -348,7 +349,6 @@ public class Quiz extends Thread{
 	
 	private String receiveAndSendQuestions(int qseq_no)
 	{
-		int count = 0;
 		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
 		DatagramPacket p = new DatagramPacket(b, b.length);
 		
@@ -359,15 +359,11 @@ public class Quiz extends Thread{
 			}
 			catch( SocketTimeoutException e )
 			{
-				count++;
-				if( count >= questionTimelimitInSeconds )
-				{
-					break;
-				}
 				continue;
 			}
 			catch (IOException e) {
-				break;
+				e.printStackTrace();
+				System.exit(0);
 			}
 			/*
 			 * Question is received
@@ -423,10 +419,16 @@ public class Quiz extends Thread{
 						 
 						try {
 							sendSocket.send(dp);
+							Thread.sleep(1000);
+							sendSocket.send(dp);
 						} catch (IOException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
 						}
+						
 						
 						System.out.println("Question sent to group \""+qp.groupName+"\" leader!");
 						/*
@@ -454,20 +456,23 @@ public class Quiz extends Thread{
 						qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_BROADCAST_SERVER_SEND, false, false, false, Utilities.serialize(qp));
 						qpack.quizPacket = true;
 						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+						System.out.println("ACK SENT");
 						try {
-							Thread.sleep(1000);
+							Thread.sleep(2000);
 						} catch (InterruptedException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
 						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+						System.out.println("ACK SENT");
 						try {
-							Thread.sleep(1000);
+							Thread.sleep(2000);
 						} catch (InterruptedException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
 						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+						System.out.println("ACK SENT");
 						return qp.correctAnswerOption;
 					}
 					else if( a==2 )
@@ -479,11 +484,31 @@ public class Quiz extends Thread{
 						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(qp));
 						qpack.quizPacket = true;
 						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
 					}
 				}
 			}
 		}
-		return null;
+//		return null;
 	}
 	
 	private void sendInterfacePacketBCast(int grpIndex)
@@ -508,7 +533,14 @@ public class Quiz extends Thread{
 			e.printStackTrace();
 		}
 		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
-		
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
+		System.out.println("Send all the packets !!. Hope the clients interface is changed!!");
 	}
 
 	private void sendGroupsToStudents(ArrayList<Group> grp)
@@ -589,7 +621,9 @@ public class Quiz extends Thread{
 
 	public void cleanBuffer()
 	{
+		int initTimeout = 1;
 		try {
+			initTimeout = recvSocket.getSoTimeout();
 			// 1 second
 			recvSocket.setSoTimeout(1000);
 		} catch (SocketException e1) {
@@ -608,6 +642,13 @@ public class Quiz extends Thread{
 				 * This exception occurs when there are no packets for the specified timeout period.
 				 * Buffer is clean!!
 				 */
+				try {
+					recvSocket.setSoTimeout(initTimeout);
+				} catch (SocketException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				return;
 			}
 			catch (IOException e) {
 				e.printStackTrace();
