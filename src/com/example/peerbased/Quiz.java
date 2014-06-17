@@ -381,7 +381,7 @@ public class Quiz extends Thread{
 						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
 						for(int i=0;i<4;i++)
 						{
-							System.out.print(qp.options[i]);
+							System.out.println((i+1)+" : "+qp.options[i]);
 						}
 						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
 					}
@@ -390,7 +390,7 @@ public class Quiz extends Thread{
 						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
 						for(int i=0;i<2;i++)
 						{
-							System.out.print(qp.options[i]);
+							System.out.println((i+1)+" : "+qp.options[i]);
 						}
 						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
 					}
@@ -484,26 +484,6 @@ public class Quiz extends Thread{
 						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(qp));
 						qpack.quizPacket = true;
 						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
-						try {
-							Thread.sleep(1000);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
-						try {
-							Thread.sleep(1000);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
-						try {
-							Thread.sleep(1000);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
 					}
 				}
 			}
