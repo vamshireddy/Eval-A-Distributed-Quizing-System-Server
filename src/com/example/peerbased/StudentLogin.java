@@ -46,13 +46,10 @@ public class StudentLogin extends Thread{
 		    
 		    Packet data_packet = (Packet)Utilities.deserialize(buffer);
 
-		    Object obj = Utilities.deserialize(data_packet.data);
-		    
-	    	AuthPacket auth_packet = null;
+	    	AuthPacket auth_packet = (AuthPacket)Utilities.deserialize(data_packet.data);
 	    	
 		    if( data_packet.auth_packet == true && data_packet.seq_no == PacketSequenceNos.AUTHENTICATION_SEND_CLIENT )
 		    {	
-		    	auth_packet = (AuthPacket)obj;
 		    	System.out.println("Name : "+auth_packet.studentName+" Uid : "+auth_packet.userID+" pass : "+auth_packet.password);
 		    }
 		    else

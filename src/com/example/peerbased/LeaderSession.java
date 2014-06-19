@@ -6,6 +6,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 
 
@@ -92,12 +93,13 @@ public class LeaderSession extends Thread{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
 		while(true)
 		{
 			new Interupter(time_limit).start();
 			runSession();
 			
-			System.out.println("The Leader Request Session time has been completed Press 1 to Repeat \nPress 2 to go ahead");
+			System.out.println("The Leader Request Session time has been completed Press 1 to Repeat");
 			int choice = Utilities.scan.nextInt();
 			if( choice == 1 )
 			{
@@ -339,43 +341,40 @@ public class LeaderSession extends Thread{
 		lp.LeadersListBroadcast = true; // This is flag to differentiate the list packet for non-leaders and group name selection packet for leaders
 		lp.leaders = leaders;			// Add the leaders
 		
-		Packet p = new Packet(PacketSequenceNos.SELECTED_LEADERS_SERVER_SEND, false, false, false, Utilities.serialize(lp), false, true);
-		byte[] bytes = Utilities.serialize(p);
-		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, IP, Utilities.clientPort);
+		Packet sendPacky = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(lp), false, true);
+		sendPacky.ack = false;
+		sendPacky.type = PacketTypes.LEADER_SCREEN_CHANGE;
 		
-		try {
-			sendSock.send(pack);
-			Thread.sleep(1000);
-			sendSock.send(pack);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		Quiz.sendToClient_Reliable(sendSock, recvSock, IP, sendPacky);
 	}
 	
-	private void sendLeaderMessage(InetAddress iP){
+	
+	/*
+	 * Uses reliable UDP
+	 */
+	private void sendLeaderMessage(InetAddress IP)
+	{
 		
 		// TODO can add strict check's at the client by sending the userName and ID. That will be validated at the client side
+		/*
+		 * Create a leader packet, packet and send it to the client. Wait for the acknowldgement and try for Utilities.noOfAttempts times
+		 * Sequence number is used to track the same packets and reply from the client to the resp packet which is sent by the server
+		 * Sequence number is global and incremented for every client
+		 */
 		LeaderPacket lp = new LeaderPacket();
+		/*
+		 * Switch on the groupName request flag
+		 */
 		lp.grpNameRequest = true;
-		Packet p = new Packet(PacketSequenceNos.GROUP_SERVER_SEND, false, false, false, Utilities.serialize(lp), false, true);
-		byte[] bytes = Utilities.serialize(p);
-		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, iP, Utilities.clientPort);
 		
-		try {
-			sendSock.send(pack);
-			Thread.sleep(1000);
-			sendSock.send(pack);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		
+		Packet sendPacky = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(lp), false, true);
+		sendPacky.ack = false;
+		sendPacky.type = PacketTypes.LEADER_SCREEN_CHANGE;
+		/*
+		 * For receiving the packet
+		 */
+		Quiz.sendToClient_Reliable(sendSock, recvSock, IP, sendPacky);
 	}
 	
 	

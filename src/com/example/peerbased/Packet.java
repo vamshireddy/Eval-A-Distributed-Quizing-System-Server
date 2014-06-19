@@ -5,6 +5,7 @@ import java.io.Serializable;
 public class Packet implements Serializable{
 	static final long serialVersionUID = 42L;
 	int seq_no; 			// This will be the packet identifier
+	byte type;
 	boolean auth_packet;	// This flag will be set, if the packet is used for authentication of student or teacher
 	boolean bcast;			// This flag will be set, if the packet is a broadcast packet . Usually set by the sender
 	boolean probe_packet;	// Used when the packet is used for probing the status of the android devices (students)
@@ -13,11 +14,14 @@ public class Packet implements Serializable{
 	boolean team_selection_packet;
 	boolean group_name_selection_packet;
 	boolean quizPacket;
+	boolean ack;
 	byte[] data;			// This holds a serialized object of the class according to the flags set above.
 
 	private Packet()
 	{
 		// Initialize the fields to defaults
+		ack = false;
+		type = -1;
 		seq_no = 0;
 		auth_packet = false;
 		bcast = false;

@@ -10,12 +10,8 @@ import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Scanner;
 import java.net.*;
 import QuizPackets.*;
-
-import javax.swing.text.html.HTMLDocument.Iterator;
-
 
 import QuizPackets.QuizInterfacePacket;
 
@@ -119,19 +115,47 @@ public class Quiz extends Thread{
 		long grp_sel_time = Utilities.scan.nextLong();
 		//Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
 		
-		ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, noOfRounds, subject);
-		Packet packy = new Packet(PacketSequenceNos.QUIZ_START_BCAST_SERVER_SEND, false, true, false,Utilities.serialize(param_pack), true); // param_pack flag is true
+		 // param_pack flag is true
 		
 		// Broadcast n times
-		System.out.println("Enter the desired reliability (0-10) for the broadcast packets which are about to be sent!");
+		/*System.out.println("Enter the desired reliability (0-10) for the broadcast packets which are about to be sent!");
 		int noOfBroadcastMessages = Utilities.scan.nextInt();
 		
 		for(int i=0;i<noOfBroadcastMessages;i++)
 		{
 			broadcastQuizStartMessageAndSleep(packy);
+		}*/
+		
+		/*
+		 * Set socket timeout to 1 second
+		 */
+		try {
+			recvSocket.setSoTimeout(1000);
+		} catch (SocketException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
 		}
 		
-		System.out.println("Sent Configuration Parameters to everyone in the network!");
+		for(int i=0;i<studentsList.size();i++)
+		{
+			/*
+			 * For sending the packet
+			 */
+			ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, noOfRounds, subject);
+			Packet packy = new Packet(Utilities.seqNo, false, true, false,Utilities.serialize(param_pack), true);
+			
+			packy.type = PacketTypes.QUIZ_START;
+			packy.ack = false;
+			/*
+			 * For receiving the packet
+			 */
+			Student s = studentsList.get(i);
+			System.out.println("\nI am sending to "+s.name+"\n");
+			sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy);
+		}
+		
+		
+		System.out.println("-----------------------------------------------\nSent Configuration Parameters to everyone in the network!");
 		
 		//Start leader Session
 		cleanServerBuffer();
@@ -162,6 +186,71 @@ public class Quiz extends Thread{
 		
 		startQuiz();
 		
+	}
+	
+	public static void sendToClient_Reliable(DatagramSocket sendSock, DatagramSocket recvSock, InetAddress IP, Packet packy)
+	{
+		
+		boolean ackFlag = false;
+		
+		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
+		DatagramPacket recvPacky = new DatagramPacket(b, b.length);
+		
+		for(int j=0;j<Utilities.noOfAttempts;j++)
+		{
+			System.out.println("Attempt "+(j+1));
+			sendDatagramPacket(sendSock, IP, Utilities.clientPort, packy);
+			/*
+			 * Now try to receive the ack
+			 */
+			while( true )
+			{
+				try {
+					recvSock.receive(recvPacky);
+				}
+				catch ( SocketTimeoutException ste )
+				{
+					System.out.println("Timeout!");
+					break;
+				}
+				catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+					System.exit(0);
+				}
+				/*
+				 * Now check whether the recvd packet seqNo is matching
+					Utilities.seqNo++;		 */
+				Packet recvPacket = (Packet)Utilities.deserialize(b);
+				if( recvPacket.seq_no == Utilities.seqNo && recvPacket.ack == true )
+				{
+					System.out.println("I got a reply from client "+recvPacky.getAddress());
+					ackFlag = true;
+					/*
+					 * Got reply
+					 */
+					break;
+				}
+				else
+				{
+					System.out.println("I got a packet from client "+recvPacky.getAddress()+" But its something else");
+					continue;
+				}
+			}
+			
+			if( ackFlag == true )
+			{
+				/*
+				 * Go to next record
+				 */
+				Utilities.seqNo++;
+				return;
+			}	
+			/*
+			 * If it is false, then it will continue
+			 */
+		}
+		Utilities.seqNo++;
 	}
 	
 	private void startQuiz()
@@ -301,6 +390,14 @@ public class Quiz extends Thread{
 				{
 					System.out.println("question Seqno correct!!!");
 					System.out.println("Ans : "+answer+" rp.ans: "+rp.answer);
+					if( rp.answer == null )
+					{
+						/*
+						 * Its a wrong answer which is sent by the student
+						 */
+						sendResponseAck( false , clientIP, rp );
+						continue;
+					}
 					if( rp.answer.equals(answer) )
 					{
 						/*
@@ -455,24 +552,30 @@ public class Quiz extends Thread{
 						
 						qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_BROADCAST_SERVER_SEND, false, false, false, Utilities.serialize(qp));
 						qpack.quizPacket = true;
-						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
-						System.out.println("ACK SENT");
+						
 						try {
-							Thread.sleep(2000);
+							sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+							System.out.println("ACK SENT");
+							
+							Thread.sleep(1000);
+							
+							sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+							System.out.println("ACK SENT");
+							
+							Thread.sleep(1000);
+							
+							sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+							System.out.println("ACK SENT");
+							
+							Thread.sleep(1000);
+							
+							sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
+							System.out.println("ACK SENT");
+							
 						} catch (InterruptedException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
-						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
-						System.out.println("ACK SENT");
-						try {
-							Thread.sleep(2000);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
-						System.out.println("ACK SENT");
 						return qp.correctAnswerOption;
 					}
 					else if( a==2 )
@@ -505,21 +608,18 @@ public class Quiz extends Thread{
 		/*
 		 *  Send the packet
 		 */
-		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
+		
 		try {
+			sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
 			Thread.sleep(1000);
+			sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
+			Thread.sleep(1000);
+			sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
+		
 		System.out.println("Send all the packets !!. Hope the clients interface is changed!!");
 	}
 
@@ -538,20 +638,20 @@ public class Quiz extends Thread{
 	
 	private void sendToLeader(String gname, Student leader, ArrayList<Student> team )
 	{
+		
 		System.out.println("Sending to "+leader.name);
+
 		SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
-		Packet p = new Packet(PacketSequenceNos.FORMED_GROUP_SERVER_SEND, false, false, false, Utilities.serialize(sgp),
+		System.out.println("inside packet size is : "+Utilities.serialize(sgp).length);
+		
+		Packet sendPacky = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(sgp),
 				false, false, true, false);
-		byte[] bytes = Utilities.serialize(p);
 		
-		DatagramPacket dp = new DatagramPacket(bytes, bytes.length, leader.IP, Utilities.clientPort);
+		sendPacky.ack = false;
+		sendPacky.type = PacketTypes.GROUP_DETAILS_MESSAGE;
 		
-		try {
-			sendSocket.send(dp);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		sendToClient_Reliable(sendSocket, recvSocket, leader.IP, sendPacky);
+		
 	}
 	
 	private void sendToTeamMem(String gname , Student leader, ArrayList<Student> team)
@@ -560,17 +660,13 @@ public class Quiz extends Thread{
 		{
 			Student stud = team.get(i);
 			SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
-			Packet p = new Packet(PacketSequenceNos.FORMED_GROUP_SERVER_SEND, false, false, false, Utilities.serialize(sgp),
+			System.out.println("inside packet size is : "+Utilities.serialize(sgp).length);
+			Packet p = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(sgp),
 					false, false, true, false);
-			byte[] bytes = Utilities.serialize(p);
+			p.type = PacketTypes.GROUP_DETAILS_MESSAGE;
+			p.ack = false;
 			
-			DatagramPacket dp = new DatagramPacket(bytes, bytes.length, stud.IP, Utilities.clientPort);
-			try {
-				sendSocket.send(dp);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			sendToClient_Reliable(sendSocket, recvSocket, stud.IP, p);
 		}
 	}
 	
@@ -670,7 +766,7 @@ public class Quiz extends Thread{
 			}
 		}
 	}
-	void sendDatagramPacket(DatagramSocket sock,InetAddress ip, int port, Packet p)
+	public static void sendDatagramPacket(DatagramSocket sock,InetAddress ip, int port, Packet p)
 	{
 		byte[] buff = Utilities.serialize(p);
 		DatagramPacket packet = new DatagramPacket(buff, buff.length, ip, port);
@@ -678,19 +774,6 @@ public class Quiz extends Thread{
 		{
 			sock.send(packet);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	
-	void broadcastQuizStartMessageAndSleep(Packet p)
-	{
-		sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, p);
-		System.out.println("Sent Configuration Parameters to everyone in the network!");
-		try {
-			Thread.sleep(500);
-		}
-		catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
