@@ -27,7 +27,7 @@ class Interupter extends Thread
 	public void run()
 	{
 		try {
-			Thread.sleep(10000);
+			Thread.sleep(25000);
 			LeaderSession.running = false;
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block

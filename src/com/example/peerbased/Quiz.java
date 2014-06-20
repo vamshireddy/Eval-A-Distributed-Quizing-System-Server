@@ -144,29 +144,40 @@ public class Quiz extends Thread{
 			ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, noOfRounds, subject);
 			Packet packy = new Packet(Utilities.seqNo, false, true, false,Utilities.serialize(param_pack), true);
 			
-			packy.type = PacketTypes.QUIZ_START;
+			packy.type = PacketTypes.QUIZ_TURN_SCREEN;
 			packy.ack = false;
 			/*
 			 * For receiving the packet
 			 */
 			Student s = studentsList.get(i);
 			System.out.println("\nI am sending to "+s.name+"\n");
-			sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy);
+			if( sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy) == -1 )
+			{
+				System.out.println("Client couldn't connect");
+				System.exit(0);
+			}
 		}
 		
 		
 		System.out.println("-----------------------------------------------\nSent Configuration Parameters to everyone in the network!");
 		
-		//Start leader Session
+		/*
+		 * Start leader Session
+		 */
 		cleanServerBuffer();
+		
 		/* Clean the server buffer before starting the leader session, so that all the previous unnecessary packets are discarded! */
+		
 		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, noOfGroups, time_limit, grp_sel_time, noOfStudentsInGroup);
 		ls.startLeaderSession();
-		// Leader session ends
+		
+		/*
+		 *  Leader session ends
+		 */
 		cleanServerBuffer();
 		
 		/*
-		 * Get the data structure of groups from the leadersession object
+		 * Get the data structure of groups from the leader session object
 		 */
 		groups = ls.getGroups();
 		printGroups();
@@ -181,16 +192,13 @@ public class Quiz extends Thread{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
 		sendGroupsToStudents(groups);
-		
 		startQuiz();
 		
 	}
 	
-	public static void sendToClient_Reliable(DatagramSocket sendSock, DatagramSocket recvSock, InetAddress IP, Packet packy)
+	public static int sendToClient_Reliable(DatagramSocket sendSock, DatagramSocket recvSock, InetAddress IP, Packet packy)
 	{
-		
 		boolean ackFlag = false;
 		
 		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
@@ -241,16 +249,20 @@ public class Quiz extends Thread{
 			if( ackFlag == true )
 			{
 				/*
-				 * Go to next record
+				 * Get out of this place
 				 */
 				Utilities.seqNo++;
-				return;
+				return 1;
 			}	
 			/*
 			 * If it is false, then it will continue
 			 */
 		}
+		/*
+		 * No reply from the client, get out of this place
+		 */
 		Utilities.seqNo++;
+		return -1;
 	}
 	
 	private void startQuiz()
@@ -284,13 +296,16 @@ public class Quiz extends Thread{
 				/*
 				 * Turns
 				 */
+				Group g = groups.get(j);
+				
 				System.out.println("Sending the quiz start packet to the group "+j+" ! ");
-				sendInterfacePacketBCast(j);
+				sendInterfacePacketBCast(g);
 				/*
+				 * 
 				 * Now receive the questions from active group
 				 */
 				// Start the timer for question session
-				String answer = receiveAndSendQuestions(questionSeqNo);
+				String answer = receiveAndSendQuestions(questionSeqNo,g);
 				System.out.println("\nRecvd question!!\n");
 				if( answer == null )
 				{
@@ -352,7 +367,7 @@ public class Quiz extends Thread{
 			e1.printStackTrace();
 		}
 		
-		while( true )
+		while(true)
 		{
 			try {
 				System.out.println("\nWaiting fro responses!!!!!!!!!!!!\n");
@@ -444,7 +459,7 @@ public class Quiz extends Thread{
 		sendDatagramPacket(sendSocket, ip, Utilities.clientPort, p);
 	}
 	
-	private String receiveAndSendQuestions(int qseq_no)
+	private String receiveAndSendQuestions(int qseq_no,Group currentGrp)
 	{
 		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
 		DatagramPacket p = new DatagramPacket(b, b.length);
@@ -505,34 +520,36 @@ public class Quiz extends Thread{
 						/*
 						 * Send him positive reply saying that his question is selected
 						 */
-						QuestionPacket quesPack = new QuestionPacket(qp.groupName, (byte)2);
-						quesPack.questionAuthenticated = true;
+						qp.questionAuthenticated = true;
 						
-						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(quesPack));
+						Packet qpack = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(qp));
 						qpack.quizPacket = true;
+						qpack.ack = false;
+						qpack.type = PacketTypes.QUESTION_VALIDITY;
 						
-						byte byt[] = Utilities.serialize(qpack);
-						DatagramPacket dp = new DatagramPacket(byt, byt.length, clientIP, Utilities.clientPort);
-						 
-						try {
-							sendSocket.send(dp);
-							Thread.sleep(1000);
-							sendSocket.send(dp);
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
+						/*
+						 * Send to every one in that group
+						 * 1st send to leader, then to every one in that group
+						 */
+						
+						sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
+						
+						for(int i=0;i<currentGrp.teamMembers.size();i++)
+						{
+							Student s = currentGrp.teamMembers.get(i);
+							sendToClient_Reliable(sendSocket, recvSocket,s.IP, qpack);
 						}
 						
+						/*
+						 * Everyone is being notified in that group
+						 */
 						
-						System.out.println("Question sent to group \""+qp.groupName+"\" leader!");
 						/*
 						 * Now teacher enters the level of the question
 						 */
 						System.out.println("Enter the level of the question : ");
 						byte level = Utilities.scan.nextByte();
+						
 						questions.add(new Question(qp.question, qp.correctAnswerOption, subject, level, standard));
 						/*
 						 * Copy the level to the packet
@@ -541,40 +558,36 @@ public class Quiz extends Thread{
 						/*
 						 * Send question to everyone
 						 */
-						qp.questionAuthenticated = true;
 						/*
 						 * Use the sequence number for each new question so that the previous packets can be ignored
 						 */
-						/*
-						 * Ack leader who sent the question
-						 */
 						qp.questionSeqNo = qseq_no;
+						qp.questionAuthenticated = true;
 						
-						qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_BROADCAST_SERVER_SEND, false, false, false, Utilities.serialize(qp));
+						qpack = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(qp));
 						qpack.quizPacket = true;
+						qpack.ack = false;
+						qpack.type = PacketTypes.QUESTION_BROADCAST;
 						
-						try {
-							sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
-							System.out.println("ACK SENT");
-							
-							Thread.sleep(1000);
-							
-							sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
-							System.out.println("ACK SENT");
-							
-							Thread.sleep(1000);
-							
-							sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
-							System.out.println("ACK SENT");
-							
-							Thread.sleep(1000);
-							
-							sendDatagramPacket(sendSocket,Utilities.broadcastIP, Utilities.clientPort, qpack);
-							System.out.println("ACK SENT");
-							
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
+						for( int i=0;i<groups.size();i++ )
+						{
+							Group g = groups.get(i);
+							if( g.equals(currentGrp))
+							{
+								continue;
+							}
+							/*
+							 * Send to the leader of the group
+							 */
+							sendToClient_Reliable(sendSocket, recvSocket,g.leaderRecord.IP, qpack);
+							/*
+							 * Send to team members of the group
+							 */
+							for( int j=0;j<g.teamMembers.size();j++ )
+							{
+								Student stud = g.teamMembers.get(j);
+								sendToClient_Reliable(sendSocket, recvSocket,stud.IP, qpack);
+							}
 						}
 						return qp.correctAnswerOption;
 					}
@@ -584,43 +597,51 @@ public class Quiz extends Thread{
 						 * Send reject packet
 						 */
 						qp.questionAuthenticated = false;
+						
 						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(qp));
+						qpack.ack = false;
 						qpack.quizPacket = true;
-						sendDatagramPacket(sendSocket,clientIP, Utilities.clientPort, qpack);
+						qpack.type = PacketTypes.QUESTION_VALIDITY;
+						
+						sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
 					}
 				}
 			}
 		}
-//		return null;
 	}
 	
-	private void sendInterfacePacketBCast(int grpIndex)
+	private void sendInterfacePacketBCast(Group g)
 	{
 		/*
 		 * Make group 'g' as the active group and all others as passive 
 		 */
-		Group g = groups.get(grpIndex);
-		QuizInterfacePacket qip = new QuizInterfacePacket(g.groupName, g.leaderID);
-		
-		Packet pack = new Packet(PacketSequenceNos.QUIZ_INTERFACE_PACKET_SERVER_SEND, false, true, false, Utilities.serialize(qip));
-		pack.quizPacket = true;
-		
-		/*
-		 *  Send the packet
-		 */
 		
 		try {
-			sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
-			Thread.sleep(1000);
-			sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
-			Thread.sleep(1000);
-			sendDatagramPacket(sendSocket, broadcastIP, Utilities.clientPort, pack);
-		} catch (InterruptedException e) {
+			recvSocket.setSoTimeout(1000);
+		} catch (SocketException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
-		System.out.println("Send all the packets !!. Hope the clients interface is changed!!");
+		
+		
+		QuizInterfacePacket qip = new QuizInterfacePacket(g.groupName, g.leaderID);
+		Packet pack = new Packet(Utilities.seqNo, false, true, false, Utilities.serialize(qip));
+		
+		/*
+		 *  Send the packet
+		 */
+		for(int i=0;i<studentsList.size();i++)
+		{
+			pack.seq_no = Utilities.seqNo;
+			pack.ack = false;
+			pack.type = PacketTypes.QUIZ_INTERFACE_START_PACKET;
+			
+			Student s = studentsList.get(i);
+			sendToClient_Reliable(sendSocket,recvSocket,s.IP,pack);
+		}
+		
+		System.out.println("Sent all the packets !!. Hope the clients interface is changed!!");
 	}
 
 	private void sendGroupsToStudents(ArrayList<Group> grp)

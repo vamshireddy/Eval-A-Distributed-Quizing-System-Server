@@ -16,7 +16,7 @@ import java.util.Scanner;
 public class Utilities {
 	
 	
-	public static final int noOfAttempts = 10;
+	public static final int noOfAttempts = 20;
 	public static int seqNo = 150;
 	
 	// Constants
