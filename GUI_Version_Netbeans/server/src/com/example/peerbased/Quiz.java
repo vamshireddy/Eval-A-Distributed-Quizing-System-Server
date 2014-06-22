@@ -1,7 +1,7 @@
 package com.example.peerbased;
-import GUI.InfoPage;
+import GUI.QuizParametersGUI;
 import GUI.QuizStartPage;
-import GUI.sessionParameters;
+import GUI.waitPageGUI;
 import QuizPackets.*;
 import QuizPackets.QuizInterfacePacket;
 import com.mysql.jdbc.Connection;
@@ -112,6 +112,7 @@ public class Quiz extends Thread{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+                qsp.setVisible(false);
 	}
         
         public void setParameters(byte students, byte groups, byte studentsingroup, String standard)
@@ -132,12 +133,17 @@ public class Quiz extends Thread{
 	
         
 	/* This is the method which performs the crucial function of this class */
-	public void startQuizSession()
+	public void startQuizSession() throws InterruptedException
 	{
                 /*
                     Show the interface for teacher
                 */
-                
+                waitPageGUI wp = null;
+                if( studentsList.size() < noOfStudents )
+                {
+                     wp = new waitPageGUI();
+                     wp.setVisible(true);
+                }
 		while( studentsList.size() < noOfStudents )
 		{
 			System.out.println("Waiting for students to log in!");
@@ -148,29 +154,43 @@ public class Quiz extends Thread{
 				e.printStackTrace();
 			}
 		}
+                if( wp != null )
+                { 
+                    wp.setVisible(false);
+                }
+                
 
+                QuizParametersGUI qp = new QuizParametersGUI();
+                qp.setVisible(true);
+                /*
+                    Loop untill the values are entered
+                */
+                while( qp.fieldsEntered == false )
+                {
+                    Thread.sleep(200);
+                }
+                /*
+                    Got the values
+                */
+                qp.setVisible(false);
+		long time_limit = qp.leaderSessionTime*1000;
+		long grp_sel_time = qp.groupSelectionTime;
+                System.out.println("values are "+time_limit+" "+grp_sel_time);
                 
-		System.out.println("All the Students are logged in!.\nEnter the time in seconds for the Leader Request Session");
-		long time_limit = Utilities.scan.nextLong()*1000;
-		System.out.println("Enter the duration of the group selection phase in seconds : ");
-		long grp_sel_time = Utilities.scan.nextLong();
-                
-		//Send the OnlineStudents status and also the configuration parameters of the Quiz session to the clients
-		
-		// param_pack flag is true
-		
-		// Broadcast n times
-		/*System.out.println("Enter the desired reliability (0-10) for the broadcast packets which are about to be sent!");
-		int noOfBroadcastMessages = Utilities.scan.nextInt();
-		
-		for(int i=0;i<noOfBroadcastMessages;i++)
-		{
-			broadcastQuizStartMessageAndSleep(packy);
-		}*/
-		
-		/*
-		 * Set socket timeout to 1 second
-		 */
+                /* GUI PART */
+                if( wp == null )
+                {
+                    wp = new waitPageGUI();
+                    wp.setText("Please wait");
+                    wp.setVisible(true);
+ 
+                }
+                else
+                {
+                     wp.setVisible(true);
+                     wp.setText("Please wait");
+                }
+                /* GUI PART */
 		try {
 			recvSocket.setSoTimeout(1000);
 		} catch (SocketException e1) {
@@ -193,21 +213,23 @@ public class Quiz extends Thread{
 			 */
 			Student s = studentsList.get(i);
 			System.out.println("\nI am sending to "+s.name+"\n");
+                        
 			if( sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy) == -1 )
 			{
 				System.out.println("Client couldn't connect");
+                               
 				System.exit(0);
 			}
 		}
 		
-		
+                wp.setText("Sent Configuration Parameters to everyone in the network!");
 		System.out.println("-----------------------------------------------\nSent Configuration Parameters to everyone in the network!");
 		
 		/*
 		 * Start leader Session
 		 */
 		cleanServerBuffer();
-		
+		wp.setVisible(false);
 		/* Clean the server buffer before starting the leader session, so that all the previous unnecessary packets are discarded! */
 		
 		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, noOfGroups, time_limit, grp_sel_time, noOfStudentsInGroup);
