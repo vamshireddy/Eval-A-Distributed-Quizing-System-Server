@@ -49,6 +49,7 @@ public class Quiz extends Thread{
 	 * Question array
 	 */
 	private ArrayList<Question> questions;
+	private byte questionLevel;
 
 	private boolean running = true;
 	
@@ -252,7 +253,7 @@ public class Quiz extends Thread{
 				 * Get out of this place
 				 */
 				Utilities.seqNo++;
-				return 1;
+				return Utilities.SUCCESS;
 			}	
 			/*
 			 * If it is false, then it will continue
@@ -262,7 +263,7 @@ public class Quiz extends Thread{
 		 * No reply from the client, get out of this place
 		 */
 		Utilities.seqNo++;
-		return -1;
+		return Utilities.FAIL;
 	}
 	
 	private void startQuiz()
@@ -312,38 +313,34 @@ public class Quiz extends Thread{
 					/*
 					 * No question is formed, make next group as active
 					 */
-					System.out.println("OMG!!!!!!!!!!!!!!!!!!!!!!!!11");
+					System.out.println("OMG!!!!!!!!!!!!!!!!!!!!!!!!");
 					continue;
 				}
 				ArrayList<String> answeredStuds = getResponses(questionSeqNo, answer);
-				calculateMarks(answeredStuds, groups, j);
+				/*
+				 * Calculate the marks according to the level
+				 */
+				calculateMarks(answeredStuds);
 				questionSeqNo++;
 				cleanBuffer();
 			}
 		}
 	}
 	
-	private void calculateMarks(ArrayList<String> studs, ArrayList<Group> grps, int index)
+	private void calculateMarks(ArrayList<String> studs)
 	{	
 		
 		for(int i=0;i<studentsList.size();i++)
 		{
-			boolean flag = false;
 			Student s = studentsList.get(i);
 			for(int j=0;j<studs.size();j++)
 			{
 				if( s.uID.equals(studs.get(j)) )
 				{
-					flag = true;
 					s.noOfAnswers++;
-					s.marks = s.marks + 2;
-					s.noOfQuestions++;
+					s.marks = s.marks + questionLevel;
 					break;
 				}
-			}
-			if( flag == false )
-			{
-				s.noOfQuestions++;
 			}
 		}
 		for(int i=0;i<studentsList.size();i++)
@@ -355,8 +352,13 @@ public class Quiz extends Thread{
 	
 	private ArrayList<String> getResponses(int qseq_no, String answer)
 	{
+		/*
+		 * Arraylist for storing the ID's of the students who correctly responded to the question which is sent by the server
+		 */
 		ArrayList<String> answeredStudIDs = new ArrayList<>();
+		
 		int count = 0;
+		
 		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
 		DatagramPacket p = new DatagramPacket(b, b.length);
 		
@@ -422,7 +424,7 @@ public class Quiz extends Thread{
 						if( !answeredStudIDs.contains(rp.uID) )
 						{
 							/*
-							 * redundant
+							 * avoiding redundant entries
 							 */
 							answeredStudIDs.add(rp.uID);
 						}
@@ -466,22 +468,73 @@ public class Quiz extends Thread{
 		
 		while( true )
 		{
-			try {
-				recvSocket.receive(p);
-			}
-			catch( SocketTimeoutException e )
+			int count = 0;
+			Packet packy = null;
+			InetAddress clientIP = null;
+			
+			while( true )
 			{
-				continue;
-			}
-			catch (IOException e) {
-				e.printStackTrace();
-				System.exit(0);
+				try {
+					recvSocket.receive(p);
+				}
+				catch( SocketTimeoutException e )
+				{
+					if( count < questionTimelimitInSeconds )
+					{
+						count++;
+						continue;
+					}
+					else
+					{
+						/*
+						 * Timeout done
+						 */
+						if( packy == null )
+						{
+							System.out.println("None of the questions are formed from current group.\nPress any key to give a chance again to the same group");
+							String useless_input = Utilities.scan.nextLine();
+							/*
+							 * Ask the time limit again for the question formation and give them a chance again
+							 */
+							System.out.println("Please enter the new timelimit for forming the question: ");
+							questionTimelimitInSeconds = Utilities.scan.nextInt();
+							count = 0;
+							continue;
+						}
+						break;
+					}
+				}
+				catch (IOException e) {
+					e.printStackTrace();
+					System.exit(0);
+				}
+				/*
+				 * Question is received
+				 * send an ack immediately
+				 */
+				clientIP = p.getAddress();
+				packy = (Packet)Utilities.deserialize(b);
+				
+				/*
+				 * Send an ack back now
+				 */
+				Packet ackPacket = new Packet(PacketSequenceNos.SEQ_NOT_NEEDED, false, false, false, null);
+				ackPacket.type = PacketTypes.QUESTION_ACK;
+				ackPacket.ack = true;
+				
+				byte[] ackPacketBytes = Utilities.serialize(ackPacket);	
+				DatagramPacket ackPackDgram = new DatagramPacket(ackPacketBytes, ackPacketBytes.length,clientIP,Utilities.clientPort);
+				try {
+					sendSocket.send(ackPackDgram);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
 			/*
-			 * Question is received
+			 * Now ack is sent and session time is over, Do the processing
 			 */
-			InetAddress clientIP = p.getAddress();
-			Packet packy = (Packet)Utilities.deserialize(b);
+			
 			if( packy.seq_no == PacketSequenceNos.QUIZ_QUESTION_PACKET_CLIENT_SEND && packy.quizPacket == true )
 			{
 				QuestionPacket qp = (QuestionPacket)Utilities.deserialize(packy.data);
@@ -537,6 +590,7 @@ public class Quiz extends Thread{
 						for(int i=0;i<currentGrp.teamMembers.size();i++)
 						{
 							Student s = currentGrp.teamMembers.get(i);
+							qpack.seq_no = Utilities.seqNo;
 							sendToClient_Reliable(sendSocket, recvSocket,s.IP, qpack);
 						}
 						
@@ -549,6 +603,8 @@ public class Quiz extends Thread{
 						 */
 						System.out.println("Enter the level of the question : ");
 						byte level = Utilities.scan.nextByte();
+						
+						questionLevel = level;
 						
 						questions.add(new Question(qp.question, qp.correctAnswerOption, subject, level, standard));
 						/*
@@ -579,16 +635,31 @@ public class Quiz extends Thread{
 							/*
 							 * Send to the leader of the group
 							 */
-							sendToClient_Reliable(sendSocket, recvSocket,g.leaderRecord.IP, qpack);
+							qpack.seq_no = Utilities.seqNo;
+							if( sendToClient_Reliable(sendSocket, recvSocket,g.leaderRecord.IP, qpack) == Utilities.SUCCESS )
+							{
+								/*
+								 * If the question is sent successfully then increment the no of questions attempted for the leader
+								 */
+								g.leaderRecord.noOfQuestions++;
+							}
 							/*
 							 * Send to team members of the group
 							 */
 							for( int j=0;j<g.teamMembers.size();j++ )
 							{
 								Student stud = g.teamMembers.get(j);
-								sendToClient_Reliable(sendSocket, recvSocket,stud.IP, qpack);
+								qpack.seq_no = Utilities.seqNo;
+								if( sendToClient_Reliable(sendSocket, recvSocket,stud.IP, qpack) == Utilities.SUCCESS )
+								{
+									/*
+									 * If the question is sent successfully then increment the no of questions attempted for the student
+									 */
+									stud.noOfQuestions++;
+								}
 							}
 						}
+						questionLevel = level;
 						return qp.correctAnswerOption;
 					}
 					else if( a==2 )
@@ -598,12 +669,13 @@ public class Quiz extends Thread{
 						 */
 						qp.questionAuthenticated = false;
 						
-						Packet qpack = new Packet(PacketSequenceNos.QUIZ_QUESTION_PACKET_SERVER_ACK, false, false, false, Utilities.serialize(qp));
+						Packet qpack = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(qp));
+						qpack.type = PacketTypes.QUESTION_VALIDITY;
 						qpack.ack = false;
 						qpack.quizPacket = true;
-						qpack.type = PacketTypes.QUESTION_VALIDITY;
-						
+
 						sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
+						
 					}
 				}
 			}
@@ -787,6 +859,7 @@ public class Quiz extends Thread{
 			}
 		}
 	}
+	
 	public static void sendDatagramPacket(DatagramSocket sock,InetAddress ip, int port, Packet p)
 	{
 		byte[] buff = Utilities.serialize(p);

@@ -8,4 +8,5 @@ public class PacketTypes {
 	public static final int QUIZ_INTERFACE_START_PACKET = 4;
 	public static final int QUESTION_VALIDITY = 5;
 	public static final int QUESTION_BROADCAST = 6;
+	public static final int QUESTION_ACK = 7;
 }
