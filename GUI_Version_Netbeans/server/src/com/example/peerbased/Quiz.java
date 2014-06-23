@@ -106,6 +106,9 @@ public class Quiz extends Thread{
 			recvSocket.bind(new InetSocketAddress(Utilities.servPort));
 			// Set the broadcast IP, H
 			broadcastIP = InetAddress.getByName("192.168.1.255");
+                        
+                        recvSocket.setSoTimeout(500);
+                        
 		} catch (SocketException e) {
 			e.printStackTrace();
 		} catch (UnknownHostException e) {
@@ -133,7 +136,7 @@ public class Quiz extends Thread{
 	
         
 	/* This is the method which performs the crucial function of this class */
-	public void startQuizSession() throws InterruptedException
+	public void startQuizSession()
 	{
                 /*
                     Show the interface for teacher
@@ -167,7 +170,11 @@ public class Quiz extends Thread{
                 */
                 while( qp.fieldsEntered == false )
                 {
-                    Thread.sleep(200);
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                    }
                 }
                 /*
                     Got the values
@@ -191,12 +198,6 @@ public class Quiz extends Thread{
                      wp.setText("Please wait");
                 }
                 /* GUI PART */
-		try {
-			recvSocket.setSoTimeout(1000);
-		} catch (SocketException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
 		
 		for(int i=0;i<studentsList.size();i++)
 		{
@@ -224,11 +225,10 @@ public class Quiz extends Thread{
 		
                 wp.setText("Sent Configuration Parameters to everyone in the network!");
 		System.out.println("-----------------------------------------------\nSent Configuration Parameters to everyone in the network!");
-		
 		/*
 		 * Start leader Session
 		 */
-		cleanServerBuffer();
+		cleanBuffer();
 		wp.setVisible(false);
 		/* Clean the server buffer before starting the leader session, so that all the previous unnecessary packets are discarded! */
 		
@@ -238,7 +238,7 @@ public class Quiz extends Thread{
 		/*
 		 *  Leader session ends
 		 */
-		cleanServerBuffer();
+		cleanBuffer();
 		
 		/*
 		 * Get the data structure of groups from the leader session object
@@ -249,13 +249,7 @@ public class Quiz extends Thread{
 		System.out.println("\nEnter any key to continue\n");
 		
 		int a = Utilities.scan.nextInt();
-		
-		try {
-			recvSocket.setSoTimeout(1000);
-		} catch (SocketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+
 		sendGroupsToStudents(groups);
 		startQuiz();
 		
@@ -346,7 +340,7 @@ public class Quiz extends Thread{
 		 * Clean the server buffer so that all the previous packets which are accumulated in the buffer are destroyed!
 		 */
 		System.out.println("Cleaning the server buffer\n");
-		cleanServerBuffer();
+		cleanBuffer();
 		
 		int questionSeqNo = 1234;
 		
@@ -450,13 +444,6 @@ public class Quiz extends Thread{
 		
 		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
 		DatagramPacket p = new DatagramPacket(b, b.length);
-		
-		try {
-			recvSocket.setSoTimeout(1000);
-		} catch (SocketException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
 		
 		while(true)
 		{
@@ -777,15 +764,6 @@ public class Quiz extends Thread{
 		 * Make group 'g' as the active group and all others as passive 
 		 */
 		
-		try {
-			recvSocket.setSoTimeout(1000);
-		} catch (SocketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		
-		
 		QuizInterfacePacket qip = new QuizInterfacePacket(g.groupName, g.leaderID);
 		Packet pack = new Packet(Utilities.seqNo, false, true, false, Utilities.serialize(qip));
 		
@@ -879,14 +857,6 @@ public class Quiz extends Thread{
 
 	public void cleanBuffer()
 	{
-		int initTimeout = 1;
-		try {
-			initTimeout = recvSocket.getSoTimeout();
-			// 1 second
-			recvSocket.setSoTimeout(1000);
-		} catch (SocketException e1) {
-			e1.printStackTrace();
-		}
 		while(true)
 		{
 			byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
@@ -900,48 +870,7 @@ public class Quiz extends Thread{
 				 * This exception occurs when there are no packets for the specified timeout period.
 				 * Buffer is clean!!
 				 */
-				try {
-					recvSocket.setSoTimeout(initTimeout);
-				} catch (SocketException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				return;
-			}
-			catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-	}
-	
-	public void cleanServerBuffer()
-	{
-		try {
-			// 1 second
-			recvSocket.setSoTimeout(1000);
-		} catch (SocketException e1) {
-			e1.printStackTrace();
-		}
-		while(true)
-		{
-			byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
-			DatagramPacket p = new DatagramPacket(b, b.length);
-			try {
-				recvSocket.receive(p);
-			}
-			catch( SocketTimeoutException e1)
-			{
-				/*
-				 * This exception occurs when there are no packets for the specified timeout period.
-				 * Buffer is clean!!
-				 */
-				try {
-					recvSocket.setSoTimeout(0); // infinete timeout
-				} catch (SocketException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				return;
+                            return;
 			}
 			catch (IOException e) {
 				e.printStackTrace();

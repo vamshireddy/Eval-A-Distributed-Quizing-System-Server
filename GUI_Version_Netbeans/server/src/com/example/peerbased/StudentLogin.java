@@ -12,6 +12,8 @@ import java.util.ArrayList;
 
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class StudentLogin extends Thread{
 	
@@ -46,7 +48,43 @@ public class StudentLogin extends Thread{
 		    
 		    Packet data_packet = (Packet)Utilities.deserialize(buffer);
 
-	    	AuthPacket auth_packet = (AuthPacket)Utilities.deserialize(data_packet.data);
+                    AuthPacket auth_packet = (AuthPacket)Utilities.deserialize(data_packet.data);
+                    /*
+                        first check if it is a password change packet
+                    */
+                    if( data_packet.type == PacketTypes.PASSWORD_CHANGE )
+                    {
+                        String old_pass = auth_packet.password;
+                        String new_pass = auth_packet.new_password;
+                        String uid  = auth_packet.userID;
+                        /*
+                            Change the password
+                        */
+                        AuthPacket apSend = null;
+                        if( changePassword(uid, old_pass,new_pass) == true )
+                        {
+                            apSend = new AuthPacket(true, true);
+                        }
+                        else
+                        {
+                            apSend  = new AuthPacket(true, false);
+                        }
+                        
+                        Packet p = new Packet(0,true, false, false, Utilities.serialize(apSend));
+                        p.type = PacketTypes.PASSWORD_CHANGE;
+		
+                        byte[] buf = Utilities.serialize(p);
+		
+                        DatagramPacket packy = new DatagramPacket(buf, buf.length, clientIP, Utilities.authClientPort);
+		
+                        try {
+                        	sock.send(packy);
+                        } catch (IOException e) {
+                
+                          	e.printStackTrace();
+                        }
+                        return;
+                    }
 	    	
 		    if( data_packet.auth_packet == true && data_packet.seq_no == PacketSequenceNos.AUTHENTICATION_SEND_CLIENT )
 		    {	
@@ -114,6 +152,29 @@ public class StudentLogin extends Thread{
 			e.printStackTrace();
 		}
 	}
+        
+        private boolean changePassword(String uid, String old_pass, String new_pass )
+        {
+           
+            try {
+                
+                PreparedStatement p = (PreparedStatement)con.prepareStatement("update student_info set password = '"+new_pass+"' where password = '"+old_pass+"' and roll_number = '"+uid+"'");
+                int rows = p.executeUpdate();
+                if( rows >= 1 )
+                {
+                    System.out.println("Changed password for "+uid);
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+                
+            } catch (SQLException ex) {
+                Logger.getLogger(StudentLogin.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            return false;
+        }
 	
 	private void grantAccess(boolean flag,InetAddress clientIP, byte errorCode, String name)
 	{

@@ -87,13 +87,6 @@ public class LeaderSession extends Thread{
 	public void startLeaderSession()
 	{
 		/* Get leader requests */
-		try {
-			recvSock.setSoTimeout(1000);
-		} catch (SocketException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
 		while(true)
 		{
 			new Interupter(time_limit).start();

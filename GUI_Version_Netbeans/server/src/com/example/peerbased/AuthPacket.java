@@ -10,6 +10,7 @@ public class AuthPacket implements Serializable{
 	String userID;	// UserName entered by the student on the tablet
 	String password;	// password entered by the student on the tablet
 	String studentName;  
+        String new_password;
 	byte errorCode;	// This will be used only when the grant access flag is false
 	
 	public AuthPacket()
@@ -19,6 +20,7 @@ public class AuthPacket implements Serializable{
 		password = "";
 		changePass = false;
 		changePass = false;
+                new_password = null;
 		errorCode = -1;
 	}
 	public AuthPacket(boolean changePass, boolean grantAccess)

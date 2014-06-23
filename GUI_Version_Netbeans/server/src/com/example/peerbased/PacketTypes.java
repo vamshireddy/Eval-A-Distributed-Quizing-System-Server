@@ -10,4 +10,5 @@ public class PacketTypes {
 	public static final int QUESTION_BROADCAST = 6;
 	public static final int QUESTION_ACK = 7;
         public static final int QUIZ_END_PACKET = 8;
+        public static final int PASSWORD_CHANGE = 9;
 }

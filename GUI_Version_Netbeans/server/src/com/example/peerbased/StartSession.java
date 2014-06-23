@@ -143,7 +143,14 @@ class StartSession {
 			case 2:	// Initiates the Quiz
 					quiz = new Quiz( subject,teacherName,date, databaseConnection);
 					// This initiates the quiz with the parameters specified above
-					quiz.startQuizSession();
+					try
+                                        {
+                                            quiz.startQuizSession();
+                                        }
+                                        catch( Exception e )
+                                        {
+                                            e.printStackTrace();
+                                        }
 					break;
 			case 3:	
 					break;
