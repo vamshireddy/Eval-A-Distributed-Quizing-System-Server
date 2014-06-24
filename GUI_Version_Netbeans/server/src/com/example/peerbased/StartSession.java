@@ -54,15 +54,15 @@ class StartSession {
 		sl.start();
 	}
 	
-	public boolean verifyDetails(String id, String password)
+	public boolean verifyDetails()
 	{
 		try 
 		{
 			/*
 			 *  Prepare the statement to be executed on the database with the necessary Query string
 			 */
-			PreparedStatement p = (PreparedStatement)databaseConnection.prepareStatement("select * from teacher where teacher_id='"+id+
-																"' and password='"+password+"'");
+			PreparedStatement p = (PreparedStatement)databaseConnection.prepareStatement("select * from teacher_login,teacher_detail "
+                                + "where teacher_login.teacher_id='"+teacherID+"' and teacher_login.password='"+teacherPassword+"' and teacher_detail.std='"+standard+"'");
 			ResultSet result = p.executeQuery();
 			/*
 			 *  'result' will initially point to the record before the 1st record. To access the 1st record, use result.next().
@@ -73,8 +73,8 @@ class StartSession {
 				/*
 				 *  After getting the matched record from the database, Extract the Teacher name and subject name
 				 */
-				teacherName = result.getString("teacher_name");
-				subject = result.getString("subject");
+				teacherName = result.getString("teacher_login.teacher_name");
+				subject = result.getString("teacher_detail.subject");
 				return true;
 			}
 			else
@@ -106,11 +106,12 @@ class StartSession {
 	{	
 		while(true)
 		{
-			System.out.println("Enter your userID and password: ");
+			System.out.println("Enter your userID and password and standard: ");
 			teacherID = Utilities.scan.nextLine();
 			teacherPassword = Utilities.scan.nextLine();
+                        standard = Utilities.scan.nextLine();
 			
-			if( verifyDetails(teacherID,teacherPassword) )
+			if( verifyDetails() )
 			{
 				printWelcomeMessage();
 				/*

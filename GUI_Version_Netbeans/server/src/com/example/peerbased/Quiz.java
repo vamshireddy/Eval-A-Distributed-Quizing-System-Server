@@ -408,6 +408,10 @@ public class Quiz extends Thread{
 				System.exit(0);
 			}
 		}
+                /*
+                    Update the database
+                */
+                
 	}
 	
 	private void calculateMarks(ArrayList<String> studs)
