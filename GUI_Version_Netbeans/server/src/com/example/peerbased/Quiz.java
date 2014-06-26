@@ -5,6 +5,7 @@ import GUI.waitPageGUI;
 import QuizPackets.*;
 import QuizPackets.QuizInterfacePacket;
 import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
 import java.io.IOException;
 import java.net.*;
 import java.net.DatagramPacket;
@@ -14,6 +15,8 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -389,12 +392,11 @@ public class Quiz extends Thread{
                 packy.type = PacketTypes.QUIZ_END_PACKET;
                 packy.ack = false;
                 
-                for(int i=0;i<studentsList.size();i++)
+                for(Student s: studentsList)
 		{
 			/*
 			 * For sending the packet
 			 */
-			Student s = studentsList.get(i);
                         QuizResultPacket qrp = new QuizResultPacket(s.noOfQuestions, s.noOfAnswers, s.marks);
 			packy.seq_no = Utilities.seqNo;
                         packy.data = Utilities.serialize(qrp);
@@ -407,11 +409,22 @@ public class Quiz extends Thread{
 				System.out.println("Client couldn't connect");
 				System.exit(0);
 			}
-		}
-                /*
-                    Update the database
-                */
-                
+                        /*
+                            Update the record
+                        */
+                        try
+                        {
+                            String query = "insert into student_performance values ( '"+s.uID+"','"+s.name+"','"+subject+"','"+standard+"',"
+                                    +"CURDATE()"+",'"+s.noOfQuestions+"','"+s.noOfAnswers+"','"+s.marks+"')";
+                            System.out.println("Query is "+query);
+                            PreparedStatement ps  = (PreparedStatement)con.prepareStatement(query);
+                            ps.executeUpdate();  
+                            System.out.println("Student "+s.name+" record stored succesfully");
+                        } catch (SQLException ex) {
+                            Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                            System.out.println("Error in storing the questions");
+                        }
+                }
 	}
 	
 	private void calculateMarks(ArrayList<String> studs)
@@ -685,8 +698,16 @@ public class Quiz extends Thread{
 						byte level = Utilities.scan.nextByte();
 						
 						questionLevel = level;
-						
-						questions.add(new Question(qp.question, qp.correctAnswerOption, subject, level, standard));
+					
+                                                try
+                                                {
+                                                    PreparedStatement ps  = (PreparedStatement)con.prepareStatement("insert into question_table values ( '"+qp.question+"','"+qp.correctAnswerOption+"',"+"CURDATE()"+",'"+subject+"',"+level+","+standard+")");
+                                                    ps.executeUpdate();  
+                                                    System.out.println("Question stored succesfully in DB");
+                                                } catch (SQLException ex) {
+                                                    Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                                                    System.out.println("Error in storing the questions");
+                                                }
 						/*
 						 * Copy the level to the packet
 						 */

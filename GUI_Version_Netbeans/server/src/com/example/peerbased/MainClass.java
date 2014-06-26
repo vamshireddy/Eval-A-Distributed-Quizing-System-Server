@@ -55,6 +55,11 @@ public class MainClass {
 			// Session object is created to start the Application
 			StartSession session = new StartSession(con);
 			session.start();
+                        /*
+                            Start TCP server for performance, etc
+                        */
+                        TCPServer tcps = new TCPServer(con);
+                        tcps.start();
 		}
 		catch (SQLException e){
 			e.printStackTrace();
