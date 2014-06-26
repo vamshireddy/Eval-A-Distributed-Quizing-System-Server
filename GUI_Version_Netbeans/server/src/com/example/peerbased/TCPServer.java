@@ -140,9 +140,6 @@ class ServeFunction extends Thread
                     Now wait for the file download request
                 */
                 String JSONfilesToDownload = inFromClient.readLine();
-                
-                
-                
             }
         } catch (IOException ex) {
             Logger.getLogger(ServeFunction.class.getName()).log(Level.SEVERE, null, ex);
@@ -154,9 +151,7 @@ class ServeFunction extends Thread
     
     public String traverseAndMakeJSON(String path)
     {
-        HashMap<String,String> hm = new HashMap<>();
-        
-        String filesString = "";
+        JSONArray arr = new JSONArray();
         
         File f = new File(path);
         if( f.isDirectory() )
@@ -165,18 +160,22 @@ class ServeFunction extends Thread
             for(String filename : subNote)
             {
                     File tempFile = new File(filename);
-                    filesString = filesString + tempFile.getAbsolutePath() +"$";
+                    
+                    JSONObject tempObj = new JSONObject();
+                    tempObj.put(tempFile.getName(), tempFile.getAbsolutePath());
+                    
+                    /*
+                        Now add it to the JSON Array
+                    */
+                    arr.add(tempObj);
             }
-            hm.put("filesList",filesString);
         }
         else
         {
             System.out.println("Its not a directory!");
-            hm.put("filesList","Not a dir");
+            arr.add(new JSONObject().put("Error in fetch", "Error in fetch"));
         }
-        JSONObject obj = new JSONObject(hm);
-        return obj.toJSONString();
-        
+        return arr.toJSONString();
     }
     
     public String createPath(String standard, String subject)
@@ -320,6 +319,7 @@ public class TCPServer extends Thread{
     
     public TCPServer(Connection con)
     {
+        System.out.println("saf");
         try {
             socket = new ServerSocket(6711);
             socket.setReuseAddress(true);
@@ -334,6 +334,7 @@ public class TCPServer extends Thread{
             /*
                 Listen for clients
             */
+            System.out.println("TCP server started!");
             while( true )
             {
                 Socket clientSock = socket.accept();

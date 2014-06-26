@@ -52,6 +52,8 @@ class StartSession {
 		 */
 		StudentLogin sl = new StudentLogin(databaseConnection);
 		sl.start();
+                TCPServer tcps = new TCPServer(databaseConnection);
+                tcps.start();
 	}
 	
 	public boolean verifyDetails()
