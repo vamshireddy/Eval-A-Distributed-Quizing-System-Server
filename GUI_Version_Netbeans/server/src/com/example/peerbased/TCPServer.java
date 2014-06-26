@@ -131,6 +131,7 @@ class ServeFunction extends Thread
                     Now traverse the folder and create a JSON File
                 */
                 String filesJSONString = traverseAndMakeJSON(pathName);
+                System.out.println("I am sending this to client : "+filesJSONString);
                 /*
                     Send it to the client back
                 */
@@ -140,6 +141,7 @@ class ServeFunction extends Thread
                     Now wait for the file download request
                 */
                 String JSONfilesToDownload = inFromClient.readLine();
+                System.out.println("CLIENT ASKED FOR :"+JSONfilesToDownload);
             }
         } catch (IOException ex) {
             Logger.getLogger(ServeFunction.class.getName()).log(Level.SEVERE, null, ex);
@@ -151,7 +153,7 @@ class ServeFunction extends Thread
     
     public String traverseAndMakeJSON(String path)
     {
-        JSONArray arr = new JSONArray();
+        JSONObject obj = new JSONObject();
         
         File f = new File(path);
         if( f.isDirectory() )
@@ -160,22 +162,15 @@ class ServeFunction extends Thread
             for(String filename : subNote)
             {
                     File tempFile = new File(filename);
-                    
-                    JSONObject tempObj = new JSONObject();
-                    tempObj.put(tempFile.getName(), tempFile.getAbsolutePath());
-                    
-                    /*
-                        Now add it to the JSON Array
-                    */
-                    arr.add(tempObj);
+                    obj.put(tempFile.getName(), tempFile.getAbsolutePath());
             }
         }
         else
         {
             System.out.println("Its not a directory!");
-            arr.add(new JSONObject().put("Error in fetch", "Error in fetch"));
+            obj.put("Error fetching","Error");
         }
-        return arr.toJSONString();
+        return obj.toJSONString();
     }
     
     public String createPath(String standard, String subject)
@@ -184,7 +179,8 @@ class ServeFunction extends Thread
             standard should be in the format : standard<number>
             Subject name should be started with capitalized letter
         */
-        String path = "Files/"+standard+"/"+subject;
+        String path = "Files/standard6/Maths";
+        System.out.println(path);
         return path;
     }
     
