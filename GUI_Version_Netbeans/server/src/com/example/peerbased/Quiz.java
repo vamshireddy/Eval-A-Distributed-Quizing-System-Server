@@ -623,13 +623,16 @@ public class Quiz extends Thread
                                     responseCount[i] = 0;
                                 }
                                 break;
-                    case 3 :    responseCount = new int[1];
-                                responseOptions = new String[1];
-                                for(int i=0;i<1;i++)
-                                {
-                                    responseOptions[i] = questionFormed.get("option"+(i+1));
-                                    responseCount[i] = 0;
-                                }
+                    case 3 :    responseCount = new int[2];
+                                responseOptions = new String[2];
+
+                                responseOptions[0] = questionFormed.get("option1");
+                                responseCount[0] = 0;
+                                /*
+                                    This indicated the incorrect answered percentage
+                                */
+                                responseOptions[1] = "Incorrect";
+                                responseCount[1] = 0;
                                 break;
                 }
                 
@@ -723,12 +726,14 @@ public class Quiz extends Thread
                                                            }
                                                        }
                                                        break;
-                                            case 3  :  for(int i=0;i<1;i++)
+                                            case 3  :  
+                                                       if( responseOptions[0].equals(reply) )
                                                        {
-                                                           if( responseOptions[i].equals(reply) )
-                                                           {
-                                                               responseCount[i]++;
-                                                           }
+                                                            responseCount[0]++;
+                                                       }
+                                                       else
+                                                       {
+                                                            responseCount[1]++;
                                                        }
                                                        break;
                                         }
@@ -781,7 +786,7 @@ public class Quiz extends Thread
                                }
                                break;
                         
-                    case 3  :  for(int i=0;i<1;i++)
+                    case 3  :  for(int i=0;i<2;i++)
                                {
                                    stats.put(responseOptions[i],responseCount[i]);
                                }
@@ -867,14 +872,16 @@ public class Quiz extends Thread
                                                             /*
                                                                 Give a chance to the next team
                                                             */
-                                                            System.out.println("REPEATING");
+                                                            
                                                             ext.setVisible(false);
                                                             return null;
                                                         }
+                                                        System.out.println("REPEATING");
                                                         /*
                                                             Repeat the session
                                                         */
                                                         ext.setVisible(false);
+                                                        count = 0;
 							continue;
 						}
 						break;
@@ -1034,6 +1041,7 @@ public class Quiz extends Thread
 						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
 						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
                                                 
+                                                questionFormed.put("option1",qp.correctAnswerOption);
                                                 /*
                                                     Add the answer to hashmap
                                                 */

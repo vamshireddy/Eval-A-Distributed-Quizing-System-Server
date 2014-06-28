@@ -16,6 +16,8 @@ import com.bluewalrus.bar.YAxis;
 import com.bluewalrus.chart.BarChart;
 import com.bluewalrus.chart.MultiBarChart;
 import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Toolkit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
@@ -69,7 +71,14 @@ public class ResponseStatistics extends javax.swing.JFrame {
     {
         ChartPanel chartPanel = new ChartPanel(chart);
         // default size
-        chartPanel.setPreferredSize(new java.awt.Dimension(800, 560));
+        chartPanel.setSize(560,800);
+        
+        Dimension dimension = Toolkit.getDefaultToolkit().getScreenSize();
+        int x = (int) ((dimension.getWidth() - chartPanel.getWidth()) / 2);
+        int y = (int) ((dimension.getHeight() - chartPanel.getHeight()) / 2);
+        
+        
+        chartPanel.setLocation(WIDTH, WIDTH);
         // add it to our application
         setContentPane(chartPanel);
         
@@ -158,7 +167,7 @@ public class ResponseStatistics extends javax.swing.JFrame {
             dataset = createDatasetOneWord(hm);
         }
                 
-        JFreeChart chart = createChart(dataset, question);
+        JFreeChart chart = createChart(dataset, "Response for the Question : "+question);
         
         InitPieChart(chart);
         
@@ -196,14 +205,15 @@ public class ResponseStatistics extends javax.swing.JFrame {
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 391, Short.MAX_VALUE)
+            .addGap(0, 800, Short.MAX_VALUE)
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 300, Short.MAX_VALUE)
+            .addGap(0, 560, Short.MAX_VALUE)
         );
 
-        pack();
+        setSize(new java.awt.Dimension(810, 560));
+        setLocationRelativeTo(null);
     }// </editor-fold>//GEN-END:initComponents
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
