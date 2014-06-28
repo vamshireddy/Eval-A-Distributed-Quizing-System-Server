@@ -92,8 +92,9 @@ class ServeFunction extends Thread
                 */
                 String subject = (String)json.get("subject");
                 String dateInMs = (String)json.get("date");
+                String standard = (String)json.get("standard");
                 System.out.println("DATE : "+dateInMs);
-                String clientString = getJSONQuestionsString(subject,dateInMs);
+                String clientString = getJSONQuestionsString(subject,dateInMs,standard);
                 System.out.println("JSON STRING : "+clientString);
                 outToClient.writeBytes(clientString+"\n");
             }
@@ -147,6 +148,16 @@ class ServeFunction extends Thread
                     Now wait for the file download request
                 */
                 String JSONfileToDownload = inFromClient.readLine();
+                
+                if( JSONfileToDownload == null )
+                {
+                    /*
+                        Client sent nothing
+                        Exit the thread
+                    */
+                    
+                    return;
+                }
 
                 System.out.println("CLIENT ASKED FOR :"+JSONfileToDownload);
 
@@ -207,6 +218,7 @@ class ServeFunction extends Thread
                 } catch (InterruptedException ex) {
                     Logger.getLogger(ServeFunction.class.getName()).log(Level.SEVERE, null, ex);
                 }
+                
                 BufferedInputStream buff = new BufferedInputStream(new FileInputStream(transferFile));
 
                 byte[] buffer = new byte[1024];
@@ -223,10 +235,13 @@ class ServeFunction extends Thread
                 sock.close();
                 System.out.println("File sent to client");
             }
+            
         } catch (IOException ex) {
             Logger.getLogger(ServeFunction.class.getName()).log(Level.SEVERE, null, ex);
+            System.out.println("CLIENT CLOSED ABRUPTLY\n");
         } catch (ParseException ex) {
             Logger.getLogger(ServeFunction.class.getName()).log(Level.SEVERE, null, ex);
+             System.out.println("UNABLE TO PARSE\n");
         }
         
     }
@@ -354,13 +369,13 @@ class ServeFunction extends Thread
         }
         return null;
     }
-    public String getJSONQuestionsString(String sub, String date)
+    public String getJSONQuestionsString(String sub, String date, String standard)
     {
         PreparedStatement p;
         try {
             
             p = (PreparedStatement)con.prepareStatement("select * from question_table"
-                    +" where subject='"+sub+"' and date >='"+date+"'");
+                    +" where subject='"+sub+"' and date >='"+date+"'"+" and "+"std='"+standard+"'");
             ResultSet result = p.executeQuery();
             
             /*
@@ -377,9 +392,11 @@ class ServeFunction extends Thread
                 ans = level+"$"+datey+"$"+ans;
                 hm.put(ques, ans);
             }
+            
             /*
                 Now form a JSON Object
             */
+            
             JSONObject jobj = new JSONObject(hm);
             System.out.println(jobj.toJSONString());
             return jobj.toJSONString();

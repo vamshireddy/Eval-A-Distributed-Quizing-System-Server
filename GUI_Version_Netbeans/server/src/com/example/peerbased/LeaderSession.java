@@ -165,7 +165,7 @@ public class LeaderSession extends Thread{
 			serveGroupsRequestsFunction();
                         dl.setVisible(false);
                         lsw.resetWait();
-                        lsw.setLabel("Group dkjhsakf");
+                        lsw.setLabel("Group selection session is done!");
                         lsw.setVisible(true);
 			System.out.println("The Group serve time has been completed Press 1 to Repeat 2 to continue");
 			

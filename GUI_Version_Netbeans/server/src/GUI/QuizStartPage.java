@@ -12,22 +12,16 @@ import com.example.peerbased.Quiz;
  *
  * @author vamshi
  */
-public class QuizStartPage extends javax.swing.JFrame implements Runnable{
+public class QuizStartPage extends javax.swing.JFrame{
 
     /**
      * Creates new form QuizStartPage
      */
-    public QuizStartPage(){
+    public QuizStartPage(Quiz q){
         initComponents();
-        quiz = Quiz.staticVar;
+        quiz = q;
         fieldsEntered = false;
         
-    }
-
-    public void run()
-    {
-        QuizStartPage q = new QuizStartPage();
-        q.setVisible(true);
     }
     /**
      * This method is called from within the constructor to initialize the form.
@@ -183,12 +177,29 @@ public class QuizStartPage extends javax.swing.JFrame implements Runnable{
         /*
         Entered Parameters are correct
         */
-        quiz.setParameters(noOfStudentsInClass,noOfGroups,noOfStudentsInGroup,standardOfClass);
         fieldsEntered = true;
-        System.out.println("Fields entered is "+fieldsEntered);
-        this.setVisible(false);
     }//GEN-LAST:event_submitButtonActionPerformed
 
+    public byte getGroups()
+    {
+        return noOfGroups;
+    }
+    
+    public byte getStudentsInGroup()
+    {
+        return noOfStudentsInGroup;
+    }
+    
+    public String getStandard()
+    {
+        return standardOfClass;
+    }
+    
+    public byte getStudents()
+    {
+        return noOfStudentsInClass;
+    }
+    
     private void standardFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_standardFieldActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_standardFieldActionPerformed

@@ -8,6 +8,7 @@ import GUI.QuizParametersGUI;
 import GUI.QuizStartPage;
 import GUI.QuizStats;
 import GUI.QuizTestStartPage;
+import GUI.ResponseStatistics;
 import GUI.ResponseWait;
 import GUI.TrueOrFalseFrame;
 import GUI.waitPageGUI;
@@ -15,6 +16,7 @@ import QuizPackets.*;
 import QuizPackets.QuizInterfacePacket;
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
+import static com.sun.corba.se.impl.util.Utility.printStackTrace;
 import java.io.IOException;
 import java.net.*;
 import java.net.DatagramPacket;
@@ -24,36 +26,36 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.sql.Date;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Quiz extends Thread{
-        public static Quiz staticVar;
+
+public class Quiz extends Thread
+{
+    
+        //public static Quiz staticVar;
 	/* Classroom Parameters */
 	private byte noOfStudents;
 	private byte noOfGroups;
 	private byte noOfStudentsInGroup;
 	private byte noOfRounds;
-	private ArrayList<Student> studentsList;
-	private ArrayList<String> leaderList;
-	private ArrayList<Group> groups;
-	private int questionTimelimitInSeconds;
-	private int AnswerTimeLimitInSeconds;
+	private ArrayList<Student> studentsList;    // Students List stores the records of all the students logged in
+	private ArrayList<String> leaderList;       // Leaders list will store the leader ID's requests.
+        private ArrayList<String> answeredStuds;
+	private ArrayList<Group> groups;            // Group contains a leader and team members
+	private int questionTimelimitInSeconds;     // Question asking time limit which is assigned by teacher
+	private int AnswerTimeLimitInSeconds;       // Answer time limit for the Questions asked
 	
 	/* Teacher Parameters */
-	private String subject;
-	private String teacherName;
-	private String standard;
-	
-	/* Date and time of the quiz */
-	private Date date;
-	private String timeStamp;
-		
+	private String subject;                     // Subject of the teacher
+	private String teacherName;                 // Teacher Name
+	private String standard;                    // Teacher standard
+
 	/* Network Parameters */
 	private DatagramSocket sendSocket;  
 	private DatagramSocket recvSocket;
@@ -78,14 +80,15 @@ public class Quiz extends Thread{
         private OneWordFrame owf;
         private LevelFrame lf;
         private ResponseWait rw;
-       // private AnswerWaitPage awp;
         private QuestionTimeExtension ext;
         
 	/* Constructor */
-	public Quiz(String subject,String teacherName,Date date, Connection c)
+	public Quiz(String subject,String teacherName, Connection c)
 	{
             
-                // GUI FRAME INIT
+                /*
+                    GUI FRAME INITIALIZATION
+                */
                 qwp = new QuestionWaitPage();
                 mcf = new MultipleChoiceFrame();
                 tff = new TrueOrFalseFrame();
@@ -95,22 +98,21 @@ public class Quiz extends Thread{
                 rw = new ResponseWait();
                 ext = new QuestionTimeExtension();
                 qwp = new QuestionWaitPage();
+                /*
+                    GUI FRAME INITIALIZATION
+                */
                 
-                staticVar = this;
                 /*
                 Create a GUI thread
                 */
                 System.out.println("waiting for parameters");
                 
-                QuizStartPage qsp = new QuizStartPage();
+                QuizStartPage qsp = new QuizStartPage(this);
                 qsp.setVisible(true);
-                Thread t = new Thread(qsp);
                 
-                //java.awt.EventQueue.invokeLater(t);
                 
                 while( qsp.fieldsEntered == false )
                 {
-                    System.out.println("Fields entered in main is "+qsp.fieldsEntered);
                     try
                     {
                         /*
@@ -124,10 +126,12 @@ public class Quiz extends Thread{
                 }
                 qsp.setVisible(false);
                 
+                /*
+                    Get the parametere from the GUI and set it
+                */
+                setParameters(qsp.getStudents(), qsp.getGroups(), qsp.getStudentsInGroup(), qsp.getStandard());
                 
-                
-                
-                System.out.println("Got parameters studets:"+noOfStudents+" ");
+                System.out.println("Got parameters studets:"+noOfStudents+"\n");
 		/* Initialize the parameters which are passed from the previous class */
 		this.con = c;
 		this.teacherName = teacherName;
@@ -136,8 +140,6 @@ public class Quiz extends Thread{
 		this.questions = new ArrayList<>();
 		// Set the student list hadler so that all classes can access it!
 		
-		this.date = date;
-		timeStamp = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime());
 		
 		try {
 			sendSocket = new DatagramSocket();
@@ -161,7 +163,7 @@ public class Quiz extends Thread{
         
         public void setParameters(byte students, byte groups, byte studentsingroup, String standard)
         {
-                System.out.println(" setting stduetts  = "+students);
+                System.out.println(" setting students  = "+students);
                 noOfGroups = groups;
                 noOfStudents = students;
                 noOfStudentsInGroup = studentsingroup;
@@ -429,25 +431,37 @@ public class Quiz extends Thread{
 				 */
 				// Start the timer for question session
                                 qwp.setVisible(true);
-				String answer = receiveAndSendQuestions(questionSeqNo,g);
+                                
+				HashMap<String,String> questionFormed = receiveAndSendQuestions(questionSeqNo,g);
+                                
                                 qwp.setVisible(false);
+                                
 				System.out.println("\nRecvd question!!\n");
-				if( answer == null )
+                                
+                                
+				if( questionFormed == null )
 				{
 					/*
 					 * No question is formed, make next group as active
 					 */
-					System.out.println("OMG!!!!!!!!!!!!!!!!!!!!!!!!");
+					System.out.println("OMG!!!!!!!!!!!!!!!!!!!!!!!!\n\n\n");
                                         qwp.setVisible(true);
 					continue;
 				}
                                 
                                 
-				ArrayList<String> answeredStuds = getResponses(questionSeqNo, answer);
+				HashMap<String,Integer> stats = getResponses(questionSeqNo, questionFormed);  
 				/*
 				 * Calculate the marks according to the level
 				 */
 				calculateMarks(answeredStuds,g);
+                                
+                                /*
+                                    Print stats to teacher
+                                */
+                                
+                                showQuestionStats(questionFormed,stats);
+                                
 				questionSeqNo++;
 				cleanBuffer();
 			}
@@ -499,6 +513,31 @@ public class Quiz extends Thread{
                     Show the Home Page GUI
                 */
 	}
+        
+        private void showQuestionStats(HashMap<String,String> questionFormed, HashMap<String,Integer> stats)
+        {
+            /*
+                Display GUI 
+            */
+            
+            ResponseStatistics statsGUI = new ResponseStatistics();
+
+            statsGUI.InitChart(questionFormed.get("question"), stats, Byte.parseByte(questionFormed.get("type")));
+
+            statsGUI.setVisible(true);       
+            
+            while( statsGUI.getWaitStatus() == true )
+            {
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            
+            statsGUI.setVisible(false);
+            statsGUI.reset();
+        }
 	
 	private void calculateMarks(ArrayList<String> studs, Group g)
 	{	
@@ -541,12 +580,65 @@ public class Quiz extends Thread{
 		}
 	}
 	
-	private ArrayList<String> getResponses(int qseq_no, String answer)
+	private HashMap<String,Integer> getResponses(int qseq_no, HashMap<String,String> questionFormed)
 	{
-            /*
-                Start the GUI for the reponse listening
-            */
+                /*
+                    Start the GUI for the reponse listening
+                */
                 
+                HashMap<String,Integer> stats = new HashMap<>();
+                
+                String answer = questionFormed.get("answer");
+                
+                byte type = Byte.parseByte(questionFormed.get("type"));
+                
+                /*
+                    Create an array to collect responses
+                */
+                
+                int responseCount[] = null;
+                String responseOptions[] = null;
+                
+                if( answer == null )
+                {
+                    printStackTrace();
+                    System.exit(0);
+                }
+                
+                switch(type)
+                {
+                    case 1 :    responseCount = new int[4];
+                                responseOptions = new String[4];
+                                for(int i=0;i<4;i++)
+                                {
+                                    responseOptions[i] = questionFormed.get("option"+(i+1));
+                                    responseCount[i] = 0;
+                                }
+                                break;
+                    case 2 :    responseCount = new int[2];
+                                responseOptions = new String[2];
+                                for(int i=0;i<2;i++)
+                                {
+                                    responseOptions[i] = questionFormed.get("option"+(i+1));
+                                    responseCount[i] = 0;
+                                }
+                                break;
+                    case 3 :    responseCount = new int[1];
+                                responseOptions = new String[1];
+                                for(int i=0;i<1;i++)
+                                {
+                                    responseOptions[i] = questionFormed.get("option"+(i+1));
+                                    responseCount[i] = 0;
+                                }
+                                break;
+                }
+                
+                /*
+                    Initialise them
+                */
+                
+                
+            
                 rw.setVisible(true);
 		/*
 		 * Arraylist for storing the ID's of the students who correctly responded to the question which is sent by the server
@@ -604,6 +696,43 @@ public class Quiz extends Thread{
 						sendResponseAck( false , clientIP, rp );
 						continue;
 					}
+                                        
+                                        /*
+                                            Collect response statistics
+                                        */
+                                        
+                                        String reply = rp.answer;
+                                        
+                                        System.out.println("\n\nThe Reply is : "+reply+"\n\n");
+                                        
+                                        switch( type )
+                                        {
+                                            case 1 :   for(int i=0;i<4;i++)
+                                                       {
+                                                           if( responseOptions[i].equals(reply) )
+                                                           {
+                                                               responseCount[i]++;
+                                                           }
+                                                       }
+                                                       break;
+                                            case 2  :  for(int i=0;i<2;i++)
+                                                       {
+                                                           if( responseOptions[i].equals(reply) )
+                                                           {
+                                                               responseCount[i]++;
+                                                           }
+                                                       }
+                                                       break;
+                                            case 3  :  for(int i=0;i<1;i++)
+                                                       {
+                                                           if( responseOptions[i].equals(reply) )
+                                                           {
+                                                               responseCount[i]++;
+                                                           }
+                                                       }
+                                                       break;
+                                        }
+                                        
 					if( rp.answer.equals(answer) )
 					{
 						/*
@@ -637,8 +766,35 @@ public class Quiz extends Thread{
 				continue;
 			}
 		}
+                
+                switch( type )
+                {
+                    case 1 :   for(int i=0;i<4;i++)
+                               {
+                                   stats.put(responseOptions[i],responseCount[i]);
+                               }
+                               break;
+                        
+                    case 2  :  for(int i=0;i<2;i++)
+                               {
+                                   stats.put(responseOptions[i],responseCount[i]);
+                               }
+                               break;
+                        
+                    case 3  :  for(int i=0;i<1;i++)
+                               {
+                                   stats.put(responseOptions[i],responseCount[i]);
+                               }
+                               break;
+                }
+                
+                /*
+                    Set class variable for answered students
+                */
+                answeredStuds = answeredStudIDs;
+                
                 rw.setVisible(false);
-		return answeredStudIDs;
+		return stats;
 	}
 	
 	private void sendResponseAck(boolean res, InetAddress ip, ResponsePacket rp)
@@ -651,7 +807,10 @@ public class Quiz extends Thread{
 		sendDatagramPacket(sendSocket, ip, Utilities.clientPort, p);
 	}
 	
-	private String receiveAndSendQuestions(int qseq_no,Group currentGrp)
+        /*
+            This method will receive the question from the client, Authenticates it and sends the question to everyone except the group which asked the question
+        */
+	private HashMap<String,String> receiveAndSendQuestions(int qseq_no,Group currentGrp)
 	{
 		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
 		DatagramPacket p = new DatagramPacket(b, b.length);
@@ -752,15 +911,31 @@ public class Quiz extends Thread{
 			 * Now ack is sent and session time is over, Do the processing
 			 */
 			
+                        HashMap<String,String> questionFormed = new HashMap<>();
+                        
 			if( packy.seq_no == PacketSequenceNos.QUIZ_QUESTION_PACKET_CLIENT_SEND && packy.quizPacket == true )
 			{
 				QuestionPacket qp = (QuestionPacket)Utilities.deserialize(packy.data);
 				
+                                /*
+                                    Client should set this flag to false
+                                */
 				if( qp.questionAuthenticated == false )
 				{
                                         int a = -1;
+                                        /*
+                                            Add to question to the hashmap
+                                        */
+                                        questionFormed.put("question",qp.question);
+                                        
 					if( qp.questionType == 1 )
 					{
+                                                /*
+                                                    Add the type to the HashMap
+                                                */
+                                                
+                                                questionFormed.put("type","1");
+                                                
                                                 /*
                                                     Create a new JFrame for Multiple Choice questions and set it.
                                                 */
@@ -768,7 +943,17 @@ public class Quiz extends Thread{
 						for(int i=0;i<4;i++)
 						{
 							System.out.println((i+1)+" : "+qp.options[i]);
+                                                        /*
+                                                            Add options to the Hasmap
+                                                        */
+                                                        questionFormed.put("option"+(i+1),qp.options[i]);
 						}
+                                                
+                                                /*
+                                                    Add answer to HashMap
+                                                */
+                                                questionFormed.put("answer", qp.correctAnswerOption);
+                                                
 						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
                                                 
                                                 mcf.setFields(qp.question, qp.options[0], qp.options[1], qp.options[2], qp.options[3], qp.correctAnswerOption);
@@ -792,12 +977,31 @@ public class Quiz extends Thread{
 					}
 					else if( qp.questionType == 2 )
 					{
+                                            
+                                                   
+                                                /*
+                                                    Add the question type to the HashMap
+                                                */
+                                                
+                                                questionFormed.put("type","2");
+                                                
 						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
 						for(int i=0;i<2;i++)
 						{
 							System.out.println((i+1)+" : "+qp.options[i]);
+                                                        
+                                                        /*
+                                                            Add options to hashmap
+                                                        */
+                                                        questionFormed.put("option"+(i+1),qp.options[i]);
+                                                        
 						}
 						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
+                                                
+                                                /*
+                                                    Add answer to the hashmap
+                                                */
+                                                questionFormed.put("answer",qp.correctAnswerOption);
                                                 
                                                 tff.setFields(qp.question, qp.options[0], qp.options[1], qp.correctAnswerOption);
                                                 tff.setVisible(true);
@@ -820,8 +1024,20 @@ public class Quiz extends Thread{
 					}
 					else if( qp.questionType == 3 )
 					{
+                                            
+                                                /*
+                                                    Add the question type to the HashMap
+                                                */
+                                                
+                                                questionFormed.put("type","3");
+                                            
 						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
 						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
+                                                
+                                                /*
+                                                    Add the answer to hashmap
+                                                */
+                                                questionFormed.put("answer",qp.correctAnswerOption);
                                                 
                                                 owf.setFields(qp.question, qp.correctAnswerOption);
                                                 owf.setVisible(true);
@@ -969,7 +1185,7 @@ public class Quiz extends Thread{
 							}
 						}
 						questionLevel = level;
-						return qp.correctAnswerOption;
+						return questionFormed;
 					}
 					else if( a==2 )
 					{
@@ -1048,9 +1264,8 @@ public class Quiz extends Thread{
 	
 	private void sendToTeamMem(String gname , Student leader, ArrayList<Student> team)
 	{
-		for(int i=0;i<team.size();i++)
+		for(Student stud : team)
 		{
-			Student stud = team.get(i);
 			SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
 			System.out.println("inside packet size is : "+Utilities.serialize(sgp).length);
 			Packet p = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(sgp),
@@ -1059,17 +1274,6 @@ public class Quiz extends Thread{
 			p.ack = false;
 			
 			sendToClient_Reliable(sendSocket, recvSocket, stud.IP, p);
-		}
-	}
-	
-	private void startProbing() {
-		Probe p = new Probe(studentsList);
-		p.start();
-		try {
-			p.join();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 	}
 
@@ -1092,6 +1296,7 @@ public class Quiz extends Thread{
 			}
 			catch (IOException e) {
 				e.printStackTrace();
+                                
 			}
 		}
 	}

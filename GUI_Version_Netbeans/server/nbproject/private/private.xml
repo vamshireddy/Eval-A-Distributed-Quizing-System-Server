@@ -3,29 +3,43 @@
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/LevelFrame.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/OneWordFrame.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/TeacherOptionGeneral.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/ViewPerformanceGeneral.java</file>
             <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/MainClass.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuestionWaitPage.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/DatabaseQueries.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/Quiz.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/LeaderSession.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/OneWordFrame.java</file>
             <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/MultipleChoiceFrame.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/waitPageGUI.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuizTestStartPage.java</file>
             <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/QuizPackets/Question.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuizStartPage.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuizStats.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/DisplayLeaders.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/StartSession.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/Util.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/ViewPerformanceInTable.java</file>
             <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuestionTimeExtension.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/DisplayGroups.java</file>
             <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuizParametersGUI.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/TCPServer.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/ResponseWait.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/AuthPacket.java</file>
-            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/StudentLogin.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/TeacherRegistration.java</file>
             <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/LeaderSessionWait.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/StudentLogin.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/JavaChartDemo.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/ViewStudentGeneral.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/LevelFrame.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/LeaderSession.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/Quiz.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/DatabaseQueries.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuestionWaitPage.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/ConfigureStudentGeneral.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/waitPageGUI.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/LoginGeneral.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuizStartPage.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuizTestStartPage.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/QuizStats.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/AddStudentGeneral.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/DisplayLeaders.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/HomeOptions.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/TeacherDetails.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/StartSession.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/DisplayGroups.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/TCPServer.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/com/example/peerbased/AuthPacket.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/ResponseWait.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/generalServer/ViewQuestionGeneral.java</file>
+            <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/ResponseStatistics.java</file>
             <file>file:/home/vamshi/workspaceNew/Server/GUI_Version_Netbeans/server/src/GUI/TrueOrFalseFrame.java</file>
         </group>
     </open-files>

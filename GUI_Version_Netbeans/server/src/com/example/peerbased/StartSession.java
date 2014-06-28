@@ -17,7 +17,6 @@ class StartSession {
 	private String teacherID;		 // ID will take the string which was entered by teacher in the login prompt
 	private String teacherPassword;  // Password which was entered in the login prompt by the teacher
 	private Quiz quiz;				 // Placeholder for Quiz class object
-	private Date date;				 // Date at which the teacher logged into the system
 	private String subject;			 // Subject of the teacher fetched from database
 	private Connection databaseConnection;	 // Database connection to the underlying mySQL database
 	private ArrayList<Student> studentsList; // List of students who are connected during the session
@@ -29,7 +28,6 @@ class StartSession {
 		teacherID = "default";
 		teacherPassword = "default";
 		quiz = null;
-		date = null;
 		subject = "default";
 		databaseConnection = null;
 		studentsList = null;
@@ -40,7 +38,6 @@ class StartSession {
 	public StartSession(Connection db)
 	{
 		this();
-		date = new Date(0);
 		databaseConnection = db;
 		studentsList = StudentListHandler.getList();
 		/*
@@ -95,7 +92,7 @@ class StartSession {
 		System.exit(0);
 		return false;
 	}
-	
+        
 	// we pass the database name after creating a connection in the MainClass
 
 	
@@ -144,7 +141,7 @@ class StartSession {
 			case 1: // This case needs to access student database
 					break;
 			case 2:	// Initiates the Quiz
-					quiz = new Quiz( subject,teacherName,date, databaseConnection);
+					quiz = new Quiz( subject,teacherName,databaseConnection);
 					// This initiates the quiz with the parameters specified above
 					try
                                         {
@@ -185,5 +182,4 @@ class StartSession {
 	protected void finalize() throws Throwable {
 		System.exit(0);
 	}
-	
 }

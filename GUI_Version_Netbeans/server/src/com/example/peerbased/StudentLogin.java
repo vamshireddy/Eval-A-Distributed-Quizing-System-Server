@@ -1,5 +1,6 @@
 package com.example.peerbased;
-
+import com.mysql.jdbc.Connection;
+import com.mysql.jdbc.PreparedStatement;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -9,11 +10,12 @@ import java.net.SocketException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-
-import com.mysql.jdbc.Connection;
-import com.mysql.jdbc.PreparedStatement;
+import java.util.HashMap;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+
 
 public class StudentLogin extends Thread{
 	
@@ -22,6 +24,7 @@ public class StudentLogin extends Thread{
 	private ArrayList<Student> studentsList;
 	
 	public StudentLogin(Connection databaseConnection) {
+            
 		try 
 		{
 			con = databaseConnection;
@@ -29,17 +32,24 @@ public class StudentLogin extends Thread{
 			// Set the socket to reuse the address
 			sock.setReuseAddress(true);
 			sock.bind(new InetSocketAddress(Utilities.authServerPort));
+                        
+                        /*
+                            Get studentList from the static class
+                        */
 			studentsList = StudentListHandler.getList();
 		} 
 		catch (SocketException e){
 			e.printStackTrace();
 		}
+                
 	}
+        
 	public void receiveAuthPackets()
 	{
 		try 
 		{
 		    byte[] buffer = new byte[Utilities.MAX_BUFFER_SIZE];
+                    
 		    DatagramPacket pack =  new DatagramPacket(buffer, buffer.length);
 		    
 		    sock.receive(pack);
@@ -49,9 +59,12 @@ public class StudentLogin extends Thread{
 		    Packet data_packet = (Packet)Utilities.deserialize(buffer);
 
                     AuthPacket auth_packet = (AuthPacket)Utilities.deserialize(data_packet.data);
+                    
                     /*
-                        first check if it is a password change packet
+                        First check if it is a password change packet.
+                        If it is then just serve the request and return
                     */
+                    
                     if( data_packet.type == PacketTypes.PASSWORD_CHANGE )
                     {
                         String old_pass = auth_packet.password;
@@ -61,7 +74,7 @@ public class StudentLogin extends Thread{
                             Change the password
                         */
                         AuthPacket apSend = null;
-                        if( changePassword(uid, old_pass,new_pass) == true )
+                        if( changePassword(uid, old_pass, new_pass) == true )
                         {
                             apSend = new AuthPacket(true, true);
                         }
@@ -71,6 +84,7 @@ public class StudentLogin extends Thread{
                         }
                         
                         Packet p = new Packet(0,true, false, false, Utilities.serialize(apSend));
+                        
                         p.type = PacketTypes.PASSWORD_CHANGE;
 		
                         byte[] buf = Utilities.serialize(p);
@@ -95,18 +109,43 @@ public class StudentLogin extends Thread{
 		    	/*
 		    	 *  Send denyAccess to the client, so that the client would send the request again
 		    	 */
-		    	grantAccess(false,clientIP, Utilities.INVALID_REQUEST, "");
+                        /*
+                            Here the standard is not required. So that is why i am passing 0 as the argument
+                        */
+		    	grantAccess(false,clientIP, Utilities.INVALID_REQUEST, "", (byte)0);
 		    	return;
 		    }
 		    
-		    String studentName = verifyDetails(auth_packet.userID, auth_packet.password);
+		    HashMap<String,String> studentNameAndStd = verifyDetails(auth_packet.userID, auth_packet.password);
 		    
-		    if( studentName != null )
+                    String studentName = null;
+                    
+                    /*
+                        Gets student name
+                    */
+                    
+		    if( studentNameAndStd != null )
 		    {
+                        Set<String> set = studentNameAndStd.keySet();
+                        
+                        for( String s :  set )
+                        {
+                            studentName = s;
+                        }
+                    
+                        /*
+                            Gets standard
+                        */
+                        byte standard = Byte.parseByte(studentNameAndStd.get(studentName));
+                    
+                        System.out.println("Standard is "+standard);
+                    
 		    	/*
 		    	 * Student is authentic, Now check if the student's record has already been stored
 		    	 */
+                        
 		    	Student pres_stud = isPresent(auth_packet.userID);
+                        
 		    	if( pres_stud != null )
 		    	{
 		    		/*
@@ -114,7 +153,7 @@ public class StudentLogin extends Thread{
 		    		 */
 		    		if( pres_stud.IP.equals(clientIP) )
 			    	{
-		    			grantAccess(true,clientIP, Utilities.NO_ERROR, studentName);
+		    			grantAccess(true,clientIP, Utilities.NO_ERROR, studentName, standard);
 		    			return;
 			    	}
 			    	else
@@ -122,7 +161,7 @@ public class StudentLogin extends Thread{
 			    		/*
 			    		 * Student is logging in from different Tablet(IP)
 			    		 */
-			    		grantAccess(false, clientIP, Utilities.ALREADY_LOGGED, studentName);
+			    		grantAccess(false, clientIP, Utilities.ALREADY_LOGGED, studentName, standard);
 			    	}
 		    	}
 		    	else
@@ -130,7 +169,7 @@ public class StudentLogin extends Thread{
 		    		/*
 		    		 * Student request is new, Add an entry into the list, and send an ack to him
 		    		 */
-		    		grantAccess(true, clientIP, Utilities.NO_ERROR, studentName);
+		    		grantAccess(true, clientIP, Utilities.NO_ERROR, studentName, standard);
 		    		addStudent(clientIP,auth_packet.userID, studentName);
 		    	}
 		    }
@@ -140,7 +179,7 @@ public class StudentLogin extends Thread{
 		    	 * Entered credentials by the student didn't match with any of the records in the database
 		    	 * Send him -ve reply
 		    	 */
-		    	grantAccess(false,clientIP, Utilities.INVALID_USER_PASS, studentName);
+		    	grantAccess(false,clientIP, Utilities.INVALID_USER_PASS, studentName, (byte)0);
 		    }
 		}
 		catch (SocketException e)
@@ -176,7 +215,7 @@ public class StudentLogin extends Thread{
             return false;
         }
 	
-	private void grantAccess(boolean flag,InetAddress clientIP, byte errorCode, String name)
+	private void grantAccess(boolean flag,InetAddress clientIP, byte errorCode, String name, byte standard)
 	{
 		AuthPacket ap = null;
 		if( flag == false )
@@ -191,7 +230,8 @@ public class StudentLogin extends Thread{
 			ap = new AuthPacket(true, flag);
 		}
 		ap.studentName = name;
-		
+                ap.standard = standard;
+                
 		Packet p = new Packet(PacketSequenceNos.AUTHENTICATION_SEND_SERVER,true,false,false,Utilities.serialize(ap));
 		
 		byte[] buf = Utilities.serialize(p);
@@ -206,7 +246,7 @@ public class StudentLogin extends Thread{
 		}
 	}
 	
-	public String verifyDetails(String id, String password)
+	public HashMap<String,String> verifyDetails(String id, String password)
 	{
 		String name = null;
 		try {
@@ -230,9 +270,12 @@ public class StudentLogin extends Thread{
 			// If it returns null, then the teacher won't be authenticated with the given details
 			if( result.next() )
 			{
-				// After getting the matched record from the database, we extract the Teacher name and subject name
-				name = result.getString("name");
-				return name;
+				// After getting the matched record from the database, we extract the Student name and his standard
+				
+                                HashMap<String,String> hm = new HashMap<>();
+                                System.out.println("STANDARD IS "+result.getString("std"));
+                                hm.put(result.getString("name"),result.getString("std"));
+                                return hm;
 			}
 			else
 			{
@@ -257,11 +300,11 @@ public class StudentLogin extends Thread{
 		studentsList.add(s);
 		//System.out.println("Students list count : "+studentsList.size());
 	}
+        
 	Student isPresent(String id)
 	{
-		for(int i=0;i<studentsList.size();i++)
+		for(Student s : studentsList)
 		{
-			Student s = studentsList.get(i);
 			if( s.uID.equals(new String(id)))
 			{
 				return s;
@@ -269,6 +312,7 @@ public class StudentLogin extends Thread{
 		}
 		return null;
 	}
+        
 	public void run()
 	{
 		/* Authenticate the students */
