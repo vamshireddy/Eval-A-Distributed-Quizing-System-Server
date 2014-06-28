@@ -1,6 +1,15 @@
 package com.example.peerbased;
+import GUI.LevelFrame;
+import GUI.MultipleChoiceFrame;
+import GUI.OneWordFrame;
+import GUI.QuestionTimeExtension;
+import GUI.QuestionWaitPage;
 import GUI.QuizParametersGUI;
 import GUI.QuizStartPage;
+import GUI.QuizStats;
+import GUI.QuizTestStartPage;
+import GUI.ResponseWait;
+import GUI.TrueOrFalseFrame;
 import GUI.waitPageGUI;
 import QuizPackets.*;
 import QuizPackets.QuizInterfacePacket;
@@ -59,10 +68,34 @@ public class Quiz extends Thread{
 	private byte questionLevel;
 
 	private boolean running = true;
-	
+        
+        /*
+            GUI Pages
+        */
+	private QuestionWaitPage qwp;
+        private MultipleChoiceFrame mcf;
+        private TrueOrFalseFrame tff;
+        private OneWordFrame owf;
+        private LevelFrame lf;
+        private ResponseWait rw;
+       // private AnswerWaitPage awp;
+        private QuestionTimeExtension ext;
+        
 	/* Constructor */
 	public Quiz(String subject,String teacherName,Date date, Connection c)
 	{
+            
+                // GUI FRAME INIT
+                qwp = new QuestionWaitPage();
+                mcf = new MultipleChoiceFrame();
+                tff = new TrueOrFalseFrame();
+                owf = new OneWordFrame();
+                ext = new QuestionTimeExtension();
+                lf = new LevelFrame();
+                rw = new ResponseWait();
+                ext = new QuestionTimeExtension();
+                qwp = new QuestionWaitPage();
+                
                 staticVar = this;
                 /*
                 Create a GUI thread
@@ -78,16 +111,21 @@ public class Quiz extends Thread{
                 while( qsp.fieldsEntered == false )
                 {
                     System.out.println("Fields entered in main is "+qsp.fieldsEntered);
-                    try {
+                    try
+                    {
                         /*
                             Wait until the user enters the parameters
                         */
                         Thread.sleep(200);
+                        
                     } catch (InterruptedException ex) {
                         Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
                 qsp.setVisible(false);
+                
+                
+                
                 
                 System.out.println("Got parameters studets:"+noOfStudents+" ");
 		/* Initialize the parameters which are passed from the previous class */
@@ -183,8 +221,10 @@ public class Quiz extends Thread{
                     Got the values
                 */
                 qp.setVisible(false);
-		long time_limit = qp.leaderSessionTime*1000;
+                
+		long time_limit = qp.leaderSessionTime;
 		long grp_sel_time = qp.groupSelectionTime;
+                
                 System.out.println("values are "+time_limit+" "+grp_sel_time);
                 
                 /* GUI PART */
@@ -193,12 +233,11 @@ public class Quiz extends Thread{
                     wp = new waitPageGUI();
                     wp.setText("Please wait");
                     wp.setVisible(true);
- 
                 }
                 else
                 {
-                     wp.setVisible(true);
-                     wp.setText("Please wait");
+                    wp.setVisible(true);
+                    wp.setText("Please wait");
                 }
                 /* GUI PART */
 		
@@ -221,20 +260,20 @@ public class Quiz extends Thread{
 			if( sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy) == -1 )
 			{
 				System.out.println("Client couldn't connect");
-                               
 				System.exit(0);
 			}
 		}
 		
                 wp.setText("Sent Configuration Parameters to everyone in the network!");
 		System.out.println("-----------------------------------------------\nSent Configuration Parameters to everyone in the network!");
-		/*
+		
+                /*
 		 * Start leader Session
 		 */
 		cleanBuffer();
-		wp.setVisible(false);
 		/* Clean the server buffer before starting the leader session, so that all the previous unnecessary packets are discarded! */
 		
+                wp.setVisible(false);
 		LeaderSession ls = new LeaderSession(studentsList, sendSocket, recvSocket, noOfGroups, time_limit, grp_sel_time, noOfStudentsInGroup);
 		ls.startLeaderSession();
 		
@@ -247,13 +286,42 @@ public class Quiz extends Thread{
 		 * Get the data structure of groups from the leader session object
 		 */
 		groups = ls.getGroups();
-		printGroups();
 		
-		System.out.println("\nEnter any key to continue\n");
-		
-		int a = Utilities.scan.nextInt();
+                
+                
+//		System.out.println("\nEnter any key to Start the quiz\n");
+//		
+//		int a = Utilities.scan.nextInt();
 
 		sendGroupsToStudents(groups);
+                /*
+		 * Quiz Starts here
+		 * Get the parameters required for Quiz.
+		 */
+//		System.out.println("Enter the number of rounds : ");
+//		noOfRounds = Utilities.scan.nextByte();
+//		System.out.println("Enter the time for asking question: ");
+//		questionTimelimitInSeconds = Utilities.scan.nextInt();
+//		System.out.println("Enter the time for answering the question: ");
+//		AnswerTimeLimitInSeconds = Utilities.scan.nextInt();
+                /*
+                    GUI
+                */
+                QuizTestStartPage qtsp = new QuizTestStartPage();
+                qtsp.setVisible(true);
+                while( qtsp.getWaitStatus() == true )
+                {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+                qtsp.setVisible(false);
+                noOfRounds = qtsp.getRounds();
+                questionTimelimitInSeconds = qtsp.getQuesTime();
+                AnswerTimeLimitInSeconds = qtsp.getAnsTime();
+                
 		startQuiz();
 		
 	}
@@ -328,20 +396,14 @@ public class Quiz extends Thread{
 	
 	private void startQuiz()
 	{
-		/*
-		 * Quiz Starts here
-		 * Get the parameters required for Quiz.
-		 */
-		System.out.println("Enter the number of rounds : ");
-		noOfRounds = Utilities.scan.nextByte();
-		System.out.println("Enter the time for asking question: ");
-		questionTimelimitInSeconds = Utilities.scan.nextInt();
-		System.out.println("Enter the time for answering the question: ");
-		AnswerTimeLimitInSeconds = Utilities.scan.nextInt();
 		
 		/*
 		 * Clean the server buffer so that all the previous packets which are accumulated in the buffer are destroyed!
 		 */
+                 
+ 
+                qwp.setVisible(true);
+            
 		System.out.println("Cleaning the server buffer\n");
 		cleanBuffer();
 		
@@ -366,7 +428,9 @@ public class Quiz extends Thread{
 				 * Now receive the questions from active group
 				 */
 				// Start the timer for question session
+                                qwp.setVisible(true);
 				String answer = receiveAndSendQuestions(questionSeqNo,g);
+                                qwp.setVisible(false);
 				System.out.println("\nRecvd question!!\n");
 				if( answer == null )
 				{
@@ -374,17 +438,23 @@ public class Quiz extends Thread{
 					 * No question is formed, make next group as active
 					 */
 					System.out.println("OMG!!!!!!!!!!!!!!!!!!!!!!!!");
+                                        qwp.setVisible(true);
 					continue;
 				}
+                                
+                                
 				ArrayList<String> answeredStuds = getResponses(questionSeqNo, answer);
 				/*
 				 * Calculate the marks according to the level
 				 */
-				calculateMarks(answeredStuds);
+				calculateMarks(answeredStuds,g);
 				questionSeqNo++;
 				cleanBuffer();
 			}
 		}
+                
+                QuizStats qstat = new QuizStats();
+                qstat.setVisible(true);
                 /*
                 Quiz is completed. Send results
                 */
@@ -425,11 +495,16 @@ public class Quiz extends Thread{
                             System.out.println("Error in storing the questions");
                         }
                 }
+                /*
+                    Show the Home Page GUI
+                */
 	}
 	
-	private void calculateMarks(ArrayList<String> studs)
+	private void calculateMarks(ArrayList<String> studs, Group g)
 	{	
-		
+		/*
+                    Allot marks to the people who answered the question
+                */
 		for(int i=0;i<studentsList.size();i++)
 		{
 			Student s = studentsList.get(i);
@@ -438,11 +513,27 @@ public class Quiz extends Thread{
 				if( s.uID.equals(studs.get(j)) )
 				{
 					s.noOfAnswers++;
-					s.marks = s.marks + questionLevel;
+                                        // +2 for those who answered
+					s.marks = s.marks + 2;
 					break;
 				}
 			}
 		}
+                /*
+                    Allot marks to the group who asked the question
+                */
+                
+                g.leaderRecord.marks = g.leaderRecord.marks + questionLevel;
+                
+                for(Student s : g.teamMembers)
+                {
+                    s.marks = s.marks + questionLevel;
+                }
+                
+                /*
+                    Print
+                */
+                
 		for(int i=0;i<studentsList.size();i++)
 		{
 			Student s = studentsList.get(i);
@@ -452,6 +543,11 @@ public class Quiz extends Thread{
 	
 	private ArrayList<String> getResponses(int qseq_no, String answer)
 	{
+            /*
+                Start the GUI for the reponse listening
+            */
+                
+                rw.setVisible(true);
 		/*
 		 * Arraylist for storing the ID's of the students who correctly responded to the question which is sent by the server
 		 */
@@ -541,6 +637,7 @@ public class Quiz extends Thread{
 				continue;
 			}
 		}
+                rw.setVisible(false);
 		return answeredStudIDs;
 	}
 	
@@ -584,14 +681,41 @@ public class Quiz extends Thread{
 						 */
 						if( packy == null )
 						{
-							System.out.println("None of the questions are formed from current group.\nPress any key to give a chance again to the same group");
-							String useless_input = Utilities.scan.nextLine();
-							/*
-							 * Ask the time limit again for the question formation and give them a chance again
-							 */
-							System.out.println("Please enter the new timelimit for forming the question: ");
-							questionTimelimitInSeconds = Utilities.scan.nextInt();
-							count = 0;
+//							System.out.println("None of the questions are formed from current group.\nPress any key to give a chance again to the same group");
+//							String useless_input = Utilities.scan.nextLine();
+//							/*
+//							 * Ask the time limit again for the question formation and give them a chance again
+//							 */
+//							System.out.println("Please enter the new timelimit for forming the question: ");
+//							questionTimelimitInSeconds = Utilities.scan.nextInt();
+//                                                    
+//							count = 0;
+                                                            
+                                                        
+                                                        ext.setVisible(true);
+                                                        
+                                                        while( ext.getWaitStatus() == true )
+                                                        {
+                                                            try {
+                                                                Thread.sleep(200);
+                                                            } catch (InterruptedException ex) {
+                                                                Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                                                            }
+                                                        }
+                                                        ext.reset();
+                                                        if( ext.getSelectedButton() == 2 )
+                                                        {
+                                                            /*
+                                                                Give a chance to the next team
+                                                            */
+                                                            System.out.println("REPEATING");
+                                                            ext.setVisible(false);
+                                                            return null;
+                                                        }
+                                                        /*
+                                                            Repeat the session
+                                                        */
+                                                        ext.setVisible(false);
 							continue;
 						}
 						break;
@@ -634,14 +758,37 @@ public class Quiz extends Thread{
 				
 				if( qp.questionAuthenticated == false )
 				{
+                                        int a = -1;
 					if( qp.questionType == 1 )
 					{
+                                                /*
+                                                    Create a new JFrame for Multiple Choice questions and set it.
+                                                */
 						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
 						for(int i=0;i<4;i++)
 						{
 							System.out.println((i+1)+" : "+qp.options[i]);
 						}
 						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
+                                                
+                                                mcf.setFields(qp.question, qp.options[0], qp.options[1], qp.options[2], qp.options[3], qp.correctAnswerOption);
+                                                mcf.setVisible(true);
+                                                
+                                                /*
+                                                    Wait for the button event
+                                                */
+                                                
+                                                while( mcf.getWaitStatus() == true )
+                                                {
+                                                     try {
+                                                        Thread.sleep(200);
+                                                    } catch (InterruptedException ex) {
+                                                        Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                                                    }
+                                                }
+                                                
+                                                a = mcf.getSelectedOption();
+                                                mcf.reset();
 					}
 					else if( qp.questionType == 2 )
 					{
@@ -651,15 +798,56 @@ public class Quiz extends Thread{
 							System.out.println((i+1)+" : "+qp.options[i]);
 						}
 						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
+                                                
+                                                tff.setFields(qp.question, qp.options[0], qp.options[1], qp.correctAnswerOption);
+                                                tff.setVisible(true);
+                                                
+                                                /*
+                                                    Wait for the button event
+                                                */
+                                                
+                                                while( tff.getWaitStatus() == true )
+                                                {
+                                                    try {
+                                                        Thread.sleep(200);
+                                                    } catch (InterruptedException ex) {
+                                                        Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                                                    }
+                                                }
+                                                
+                                                a = tff.getSelectedOption();
+                                                tff.reset();
 					}
 					else if( qp.questionType == 3 )
 					{
 						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
 						System.out.println("Answer is : "+qp.correctAnswerOption+"\n\n");
+                                                
+                                                owf.setFields(qp.question, qp.correctAnswerOption);
+                                                owf.setVisible(true);
+                                                
+                                                /*
+                                                    Wait for the button event
+                                                */
+                                                while( owf.getWaitStatus() == true )
+                                                {
+                                                     try {
+                                                        Thread.sleep(200);
+                                                    } catch (InterruptedException ex) {
+                                                        Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                                                    }
+                                                }
+                                                
+                                                a = owf.getSelectedOption();
+                                                owf.reset();
 					}
 					
-					System.out.println("Is the question valid ? Press 1 for accepting it, 2 for rejecting it");
-					int a = Utilities.scan.nextInt();
+                                        owf.setVisible(false);
+                                        tff.setVisible(false);
+                                        mcf.setVisible(false);
+                                        
+//					System.out.println("Is the question valid ? Press 1 for accepting it, 2 for rejecting it");
+//					int a = Utilities.scan.nextInt();
 					
 					if( a==1 )
 					{
@@ -694,11 +882,31 @@ public class Quiz extends Thread{
 						/*
 						 * Now teacher enters the level of the question
 						 */
-						System.out.println("Enter the level of the question : ");
-						byte level = Utilities.scan.nextByte();
-						
+                                                
+                                                lf.setVisible(true);
+                                                while( lf.getWaitStatus() == true )
+                                                {
+                                                    try {
+                                                        Thread.sleep(200);
+                                                    } catch (InterruptedException ex) {
+                                                        Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                                                    }
+                                                }
+                                                
+                                                byte level = lf.getSelectedChoice();
+                                                lf.reset();
+//						System.out.println("Enter the level of the question : ");
+//						byte level = Utilities.scan.nextByte();
+						lf.setVisible(false);
+                                                
 						questionLevel = level;
 					
+                                                
+                                                /*
+                                                    Display packet sending wait page 
+                                                */
+                                               
+                                                
                                                 try
                                                 {
                                                     PreparedStatement ps  = (PreparedStatement)con.prepareStatement("insert into question_table values ( '"+qp.question+"','"+qp.correctAnswerOption+"',"+"CURDATE()"+",'"+subject+"',"+level+","+standard+")");
@@ -768,6 +976,7 @@ public class Quiz extends Thread{
 						/*
 						 * Send reject packet
 						 */
+                                                 
 						qp.questionAuthenticated = false;
 						
 						Packet qpack = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(qp));
@@ -776,7 +985,6 @@ public class Quiz extends Thread{
 						qpack.quizPacket = true;
 
 						sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
-						
 					}
 				}
 			}
@@ -804,7 +1012,6 @@ public class Quiz extends Thread{
 			Student s = studentsList.get(i);
 			sendToClient_Reliable(sendSocket,recvSocket,s.IP,pack);
 		}
-		
 		System.out.println("Sent all the packets !!. Hope the clients interface is changed!!");
 	}
 
@@ -863,20 +1070,6 @@ public class Quiz extends Thread{
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
-	}
-	
-	private void printGroups()
-	{
-		System.out.println("The groups are : ");
-		for(int i=0;i<groups.size();i++)
-		{
-			Group g = groups.get(i);
-			System.out.println("\nLeader : "+g.leaderID+" GroupName: "+g.groupName);
-			for(int j=0;j<g.teamMembers.size();j++)
-			{
-				System.out.println("Student : "+g.teamMembers.get(j).name);
-			}
 		}
 	}
 

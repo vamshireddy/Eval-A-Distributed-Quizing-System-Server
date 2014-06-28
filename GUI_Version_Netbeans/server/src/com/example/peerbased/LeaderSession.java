@@ -1,5 +1,11 @@
 package com.example.peerbased;
 
+import GUI.DisplayGroups;
+import GUI.DisplayLeaders;
+import GUI.LeaderSessionWait;
+import GUI.waitPageGUI;
+import com.mysql.jdbc.Util;
+import java.awt.Dialog;
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.DatagramPacket;
@@ -8,6 +14,8 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 class Interupter extends Thread
@@ -27,7 +35,7 @@ class Interupter extends Thread
 	public void run()
 	{
 		try {
-			Thread.sleep(25000);
+			Thread.sleep(time);
 			LeaderSession.running = false;
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
@@ -54,9 +62,9 @@ public class LeaderSession extends Thread{
 	
 	public static boolean running = true;
 	ArrayList<Student> studentsList;
-    ArrayList<Leader> leaderRequests;
-    ArrayList<Group> groups;
-    ArrayList<String> rcvdReqs;
+        ArrayList<Leader> leaderRequests;
+        ArrayList<Group> groups;
+        ArrayList<String> rcvdReqs;
 	private int noOfGroups;
 	private byte groupSize;
 	private DatagramSocket sendSock;
@@ -86,160 +94,248 @@ public class LeaderSession extends Thread{
 	
 	public void startLeaderSession()
 	{
+                
 		/* Get leader requests */
+                waitPageGUI wp = new waitPageGUI();
+                wp.setText("Please wait untill leaders give their requests");
+                LeaderSessionWait lsw = new LeaderSessionWait();
+                lsw.setVisible(false);
+                
+                DisplayLeaders dl = null;
+                
+                wp.setVisible(true);
 		while(true)
 		{
-			new Interupter(time_limit).start();
+                        
 			runSession();
+                        wp.setVisible(false);
+                        lsw.setVisible(true);
+			System.out.println("The Leader Request Session time has been completed Press 1 to Repeat 2 to continue");
 			
-			System.out.println("The Leader Request Session time has been completed Press 1 to Repeat");
-			int choice = Utilities.scan.nextInt();
+                        while( lsw.getWaitStatus() == true )
+                        {
+                            try {
+                                Thread.sleep(200);
+                            } catch (InterruptedException ex) {
+                                Logger.getLogger(LeaderSession.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                        }
+                        int choice = lsw.getChoice();
 			if( choice == 1 )
 			{
+                                lsw.resetWait();
+                                lsw.setVisible(false);
+                                wp.setVisible(true);
 				continue;
 			}
 			else
 			{
-				printLeaders();
+                                /*
+                                    Teacher pressed continue. Check if all the leader requests are recieved.
+                                */
+                                if( leaderRequests.size() < noOfGroups )
+                                {
+                                    /*
+                                        Have to continue again
+                                    */
+                                    lsw.showDialog();
+                                    lsw.resetWait();
+                                    lsw.setVisible(false);
+                                    wp.setVisible(true);
+				continue;
+                                }
+                                lsw.setVisible(false);
+				String leaders = printLeaders();
+                                dl = new DisplayLeaders(leaders);
+                                dl.setVisible(true);
 				break;
 			}
 		}
 		groups = new ArrayList<Group>(noOfGroups);
-		
 		broadCastLeaders();
 		// Now receive the group name requests from leaders and the leader selection requests from the other students
-		serveGroupnameAndGroupSelectionRequests();
+		serveGroupnameAndGroupSelectionRequests(dl,lsw);
 	}
 	
-	private void serveGroupnameAndGroupSelectionRequests()
+	private void serveGroupnameAndGroupSelectionRequests(DisplayLeaders dl, LeaderSessionWait lsw)
 	{
 		int count = 0;
 		while( true )
 		{
-			byte[] b = new byte[Utilities.MAX_BUFFER_SIZE];
-			DatagramPacket pack  =  new DatagramPacket(b, b.length);
-			try
+			serveGroupsRequestsFunction();
+                        dl.setVisible(false);
+                        lsw.resetWait();
+                        lsw.setLabel("Group dkjhsakf");
+                        lsw.setVisible(true);
+			System.out.println("The Group serve time has been completed Press 1 to Repeat 2 to continue");
+			
+                        while( lsw.getWaitStatus() == true )
+                        {
+                            try {
+                                Thread.sleep(200);
+                            } catch (InterruptedException ex) {
+                                Logger.getLogger(LeaderSession.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                        }
+                        int choice = lsw.getChoice();
+			if( choice == 1 )
 			{
-				recvSock.receive(pack);
-			}
-			catch (IOException e)
-			{
-				// TODO Auto-generated catch block
-				System.out.println("Timeout!");
-				count++;
-				if( count == grp_sel_time_limit )
-				{
-					break;
-				}
+                                lsw.resetWait();
+                                lsw.setVisible(false);
+                                dl.setVisible(true);
 				continue;
-			}
-			
-			InetAddress clientIP = pack.getAddress();
-			
-			System.out.println("Got a packet outside!!!!");
-			Packet p = (Packet)Utilities.deserialize(b);
-			if( p.group_name_selection_packet == true && p.seq_no == PacketSequenceNos.GROUP_REQ_CLIENT_SEND )
-			{
-				System.out.println("Got a packet!!!!");
-				GroupNameSelectionPacket gnsp = (GroupNameSelectionPacket)Utilities.deserialize(p.data);
-				
-				if( gnsp.accepted == false  )
-				{
-					System.out.println("Its group name request!!");
-					/*
-					 *  Check if the request has been already received
-					 */
-					if( rcvdReqs.contains(gnsp.studentID) )
-					{
-						System.out.println("Redundant request!!");
-						/*
-						 * Send reply
-						 */
-						sendGroupSelectAck(true, gnsp.groupName, gnsp.studentName, gnsp.studentID, clientIP);
-						continue;
-					}
-					// Add the group name
-					int gsize = groups.size();
-					for( int i=0;i<gsize;i++ )
-					{
-						Group g = groups.get(i);
-						if( g.leaderID.equals(gnsp.studentID) )
-						{
-							g.groupName = gnsp.groupName;
-						}
-					}
-					rcvdReqs.add(new String(gnsp.studentID));
-					/*
-					 * Send reply
-					 */
-					sendGroupSelectAck(true, gnsp.groupName, gnsp.studentName, gnsp.studentID, clientIP);
-				}
-			}
-			else if( p.team_selection_packet == true && p.seq_no == PacketSequenceNos.TEAM_REQ_CLIENT_SEND )
-			{
-				TeamSelectPacket tsp = (TeamSelectPacket)Utilities.deserialize(p.data);
-				String clientName = tsp.name;
-				String clientID = tsp.ID;
-				String leaderID = tsp.leaderID;
-				
-				if( tsp.accepted == false )
-				{
-					/*
-					 * The tsp packet received from the student should always have accepted=false
-					 */
-					if( rcvdReqs.contains(new String(clientID)) )
-					{
-						/*
-						 * Simply reject multiple requests from the same client.
-						 * This will happen only when the student's previous request was valid.
-						 */
-						System.out.println("Redundant request!!");
-						continue;
-					}
-					int gsize = groups.size();
-					for( int i=0;i<gsize;i++ )
-					{
-						Group g = groups.get(i);
-						if( g.leaderID.equals(leaderID) )
-						{
-							if( g.teamMembers.size() >= groupSize )
-							{
-								/*
-								 * If the request is not valid, Dont add the student to the rcvdRequest list
-								 * This way he/she will be allowed to select other leader
-								 */
-								sendTeamSelectAck(false,clientIP, clientID, clientName, leaderID);
-								continue;
-							}
-							/*
-							 * The below loop can be optimized!
-							 * We can avoid iterating through the studentslist, byt creating the record on the go!
-							 */
-							for(int j=0;j<studentsList.size();j++)
-							{
-								Student s = studentsList.get(j);
-								if( s.uID.equals(clientID) )
-								{
-									g.teamMembers.add(s);
-									/*
-									 * Add the student to the rcvdRequest list only if the student request is valid
-									 */
-									rcvdReqs.add(new String(clientID));
-									sendTeamSelectAck(true,clientIP, clientID, clientName, leaderID);
-									continue;
-								}
-							}
-						}
-					}
-				}
 			}
 			else
 			{
-				continue;
+                                lsw.setVisible(false);
+                                String groupText = printGroups();
+                                DisplayGroups dg = new DisplayGroups();
+                                dg.setText(groupText);
+                                dg.setVisible(true);
+                                while( dg.getWaitStatus() == true )
+                                {
+                                    try {
+                                        Thread.sleep(200);
+                                    } catch (InterruptedException ex) {
+                                        Logger.getLogger(LeaderSession.class.getName()).log(Level.SEVERE, null, ex);
+                                    }
+                                }
+                                dg.setVisible(false);
+				break;
 			}
 		}
 	}
 	
+        private void serveGroupsRequestsFunction()
+        {
+            int count = 0;
+           
+            while( true )
+            {
+                    byte[] b = new byte[Utilities.MAX_BUFFER_SIZE];
+                    DatagramPacket pack  =  new DatagramPacket(b, b.length);
+                    try
+                    {
+                            recvSock.receive(pack);
+                    }
+                    catch (IOException e)
+                    {
+                            // TODO Auto-generated catch block
+                            System.out.println("Timeout!");
+                            count++;
+                            if( count == grp_sel_time_limit )
+                            {
+                                    break;
+                            }
+                            continue;
+                    }
+
+                    InetAddress clientIP = pack.getAddress();
+
+                    System.out.println("Got a packet outside!!!!");
+                    Packet p = (Packet)Utilities.deserialize(b);
+                    if( p.group_name_selection_packet == true && p.seq_no == PacketSequenceNos.GROUP_REQ_CLIENT_SEND )
+                    {
+                            System.out.println("Got a packet!!!!");
+                            GroupNameSelectionPacket gnsp = (GroupNameSelectionPacket)Utilities.deserialize(p.data);
+
+                            if( gnsp.accepted == false  )
+                            {
+                                    System.out.println("Its group name request!!");
+                                    /*
+                                     *  Check if the request has been already received
+                                     */
+                                    if( rcvdReqs.contains(gnsp.studentID) )
+                                    {
+                                            System.out.println("Redundant request!!");
+                                            /*
+                                             * Send reply
+                                             */
+                                            sendGroupSelectAck(true, gnsp.groupName, gnsp.studentName, gnsp.studentID, clientIP);
+                                            continue;
+                                    }
+                                    // Add the group name
+                                    int gsize = groups.size();
+                                    for( int i=0;i<gsize;i++ )
+                                    {
+                                            Group g = groups.get(i);
+                                            if( g.leaderID.equals(gnsp.studentID) )
+                                            {
+                                                    g.groupName = gnsp.groupName;
+                                            }
+                                    }
+                                    rcvdReqs.add(new String(gnsp.studentID));
+                                    /*
+                                     * Send reply
+                                     */
+                                    sendGroupSelectAck(true, gnsp.groupName, gnsp.studentName, gnsp.studentID, clientIP);
+                            }
+                    }
+                    else if( p.team_selection_packet == true && p.seq_no == PacketSequenceNos.TEAM_REQ_CLIENT_SEND )
+                    {
+                            TeamSelectPacket tsp = (TeamSelectPacket)Utilities.deserialize(p.data);
+                            String clientName = tsp.name;
+                            String clientID = tsp.ID;
+                            String leaderID = tsp.leaderID;
+
+                            if( tsp.accepted == false )
+                            {
+                                    /*
+                                     * The tsp packet received from the student should always have accepted=false
+                                     */
+                                    if( rcvdReqs.contains(new String(clientID)) )
+                                    {
+                                            /*
+                                             * Simply reject multiple requests from the same client.
+                                             * This will happen only when the student's previous request was valid.
+                                             */
+                                            System.out.println("Redundant request!!");
+                                            continue;
+                                    }
+                                    int gsize = groups.size();
+                                    for( int i=0;i<gsize;i++ )
+                                    {
+                                            Group g = groups.get(i);
+                                            if( g.leaderID.equals(leaderID) )
+                                            {
+                                                    if( g.teamMembers.size() >= groupSize )
+                                                    {
+                                                            /*
+                                                             * If the request is not valid, Dont add the student to the rcvdRequest list
+                                                             * This way he/she will be allowed to select other leader
+                                                             */
+                                                            sendTeamSelectAck(false,clientIP, clientID, clientName, leaderID);
+                                                            continue;
+                                                    }
+                                                    /*
+                                                     * The below loop can be optimized!
+                                                     * We can avoid iterating through the studentslist, byt creating the record on the go!
+                                                     */
+                                                    for(int j=0;j<studentsList.size();j++)
+                                                    {
+                                                            Student s = studentsList.get(j);
+                                                            if( s.uID.equals(clientID) )
+                                                            {
+                                                                    g.teamMembers.add(s);
+                                                                    /*
+                                                                     * Add the student to the rcvdRequest list only if the student request is valid
+                                                                     */
+                                                                    rcvdReqs.add(new String(clientID));
+                                                                    sendTeamSelectAck(true,clientIP, clientID, clientName, leaderID);
+                                                                    continue;
+                                                            }
+                                                    }
+                                            }
+                                    }
+                            }
+                    }
+                    else
+                    {
+                            continue;
+                    }
+	    }
+        }
+        
 	private void sendGroupSelectAck(boolean flag, String groupName, String uName, String uID, InetAddress ip)
 	{
 		GroupNameSelectionPacket gsp = new GroupNameSelectionPacket(groupName, uID, uName);
@@ -374,15 +470,21 @@ public class LeaderSession extends Thread{
 	public void runSession()
 	{
 		byte[] b;
-		while( running == true )
+                int count = 0;
+		while( true )
 		{
 			b = new byte[Utilities.MAX_BUFFER_SIZE];
 			DatagramPacket pack  =  new DatagramPacket(b, b.length);
 			try {
 				recvSock.receive(pack);
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
+				
 				System.out.println("Timeout!");
+                                count++;
+                                if( count >= time_limit )
+                                {
+                                    break;
+                                }
 				continue;
 			}
 			Packet p = (Packet)Utilities.deserialize(b);
@@ -390,7 +492,7 @@ public class LeaderSession extends Thread{
 			{
 				System.out.println("Received a request!");
 				addRequestAndSendReply(p, pack.getAddress());
-			}
+			}   
 		}
 	}
 	public void addRequestAndSendReply(Packet p, InetAddress IPadd)
@@ -457,12 +559,33 @@ public class LeaderSession extends Thread{
 		leaderRequests.add(s);
 		return false;
 	}
-	public void printLeaders()
+	public String printLeaders()
 	{
+                String leaderString = "";
 		for(int i=0;i<leaderRequests.size();i++)
 		{
-			System.out.println("Leader UserID = "+leaderRequests.get(i));
+			leaderString = leaderString + "Leader "+(i+1)+" : "+leaderRequests.get(i).name+"\n";
 		}
+                return leaderString;
+	}
+        
+        private String printGroups()
+	{
+                String grpString = "";
+		System.out.println("The groups are : ");
+		for(int i=0;i<groups.size();i++)
+		{
+			Group g = groups.get(i);
+			grpString = grpString + "GroupName: "+g.groupName+"\n"+"Leader: "+g.leaderName+"\n";
+                        System.out.println("GroupName: "+g.groupName+"\n"+"Leader: "+g.leaderName+"\n");
+			for(int j=0;j<g.teamMembers.size();j++)
+			{
+                                grpString = grpString + "Student : "+g.teamMembers.get(j).name+"\n";
+				System.out.println("Student : "+g.teamMembers.get(j).name);
+			}
+                        grpString = grpString + "\n";
+		}
+                return grpString;
 	}
 	
 	private boolean isPresentInLeaderReqs(String id)
