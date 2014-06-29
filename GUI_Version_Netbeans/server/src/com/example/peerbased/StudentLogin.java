@@ -7,6 +7,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -24,7 +25,6 @@ public class StudentLogin extends Thread{
 	private ArrayList<Student> studentsList;
 	
 	public StudentLogin(Connection databaseConnection) {
-            
 		try 
 		{
 			con = databaseConnection;
@@ -32,6 +32,8 @@ public class StudentLogin extends Thread{
 			// Set the socket to reuse the address
 			sock.setReuseAddress(true);
 			sock.bind(new InetSocketAddress(Utilities.authServerPort));
+                        
+                        sock.setSoTimeout(500);
                         
                         /*
                             Get studentList from the static class
@@ -44,9 +46,12 @@ public class StudentLogin extends Thread{
                 
 	}
         
-	public void receiveAuthPackets()
+	public void run()
 	{
-		try 
+		
+            while( true )
+            {
+                try 
 		{
 		    byte[] buffer = new byte[Utilities.MAX_BUFFER_SIZE];
                     
@@ -54,19 +59,27 @@ public class StudentLogin extends Thread{
 		    
 		    sock.receive(pack);
 		    
+                    System.out.println("Recvd packy");
+                    
 		    InetAddress clientIP = pack.getAddress();
 		    
 		    Packet data_packet = (Packet)Utilities.deserialize(buffer);
-
-                    AuthPacket auth_packet = (AuthPacket)Utilities.deserialize(data_packet.data);
                     
                     /*
                         First check if it is a password change packet.
                         If it is then just serve the request and return
                     */
+                                                 
+                    int currentPacketSeq = data_packet.seq_no;
                     
-                    if( data_packet.type == PacketTypes.PASSWORD_CHANGE )
+                    System.out.println("Current seqno "+currentPacketSeq);
+                    
+                    AuthPacket auth_packet = null;
+                    
+                    if( data_packet.type == PacketTypes.AUTHENTICATION_CHANGE_PASS && data_packet.ack == false )
                     {
+                        
+                        auth_packet = (AuthPacket)Utilities.deserialize(data_packet.data);
                         String old_pass = auth_packet.password;
                         String new_pass = auth_packet.new_password;
                         String uid  = auth_packet.userID;
@@ -74,6 +87,7 @@ public class StudentLogin extends Thread{
                             Change the password
                         */
                         AuthPacket apSend = null;
+                        
                         if( changePassword(uid, old_pass, new_pass) == true )
                         {
                             apSend = new AuthPacket(true, true);
@@ -83,28 +97,19 @@ public class StudentLogin extends Thread{
                             apSend  = new AuthPacket(true, false);
                         }
                         
-                        Packet p = new Packet(0,true, false, false, Utilities.serialize(apSend));
-                        
-                        p.type = PacketTypes.PASSWORD_CHANGE;
-		
+                        Packet p = new Packet(currentPacketSeq, PacketTypes.AUTHENTICATION_CHANGE_PASS, true, Utilities.serialize(apSend));
+
                         byte[] buf = Utilities.serialize(p);
 		
                         DatagramPacket packy = new DatagramPacket(buf, buf.length, clientIP, Utilities.authClientPort);
 		
-                        try {
-                        	sock.send(packy);
-                        } catch (IOException e) {
-                
-                          	e.printStackTrace();
-                        }
-                        return;
+                        sock.send(packy);
+                        
+                        continue;
                     }
 	    	
-		    if( data_packet.auth_packet == true && data_packet.seq_no == PacketSequenceNos.AUTHENTICATION_SEND_CLIENT )
-		    {	
-		    	System.out.println("Name : "+auth_packet.studentName+" Uid : "+auth_packet.userID+" pass : "+auth_packet.password);
-		    }
-		    else
+
+		    if( data_packet.type != PacketTypes.AUTHENTICATION_LOGIN || data_packet.ack != false )
 		    {
 		    	/*
 		    	 *  Send denyAccess to the client, so that the client would send the request again
@@ -112,10 +117,18 @@ public class StudentLogin extends Thread{
                         /*
                             Here the standard is not required. So that is why i am passing 0 as the argument
                         */
-		    	grantAccess(false,clientIP, Utilities.INVALID_REQUEST, "", (byte)0);
-		    	return;
+                        
+                        /*
+                            Discard the packet
+                        */
+		    	continue;
 		    }
-		    
+                    
+                    System.out.println("data packet "+data_packet.data+" overall : "+data_packet);
+                    
+		    auth_packet = (AuthPacket)Utilities.deserialize(data_packet.data);
+                    
+                    
 		    HashMap<String,String> studentNameAndStd = verifyDetails(auth_packet.userID, auth_packet.password);
 		    
                     String studentName = null;
@@ -123,7 +136,7 @@ public class StudentLogin extends Thread{
                     /*
                         Gets student name
                     */
-                    
+
 		    if( studentNameAndStd != null )
 		    {
                         Set<String> set = studentNameAndStd.keySet();
@@ -153,15 +166,15 @@ public class StudentLogin extends Thread{
 		    		 */
 		    		if( pres_stud.IP.equals(clientIP) )
 			    	{
-		    			grantAccess(true,clientIP, Utilities.NO_ERROR, studentName, standard);
-		    			return;
+		    			grantAccess(currentPacketSeq, true,clientIP, Utilities.NO_ERROR, studentName, standard);
+		    			continue;
 			    	}
 			    	else
 			    	{
 			    		/*
 			    		 * Student is logging in from different Tablet(IP)
 			    		 */
-			    		grantAccess(false, clientIP, Utilities.ALREADY_LOGGED, studentName, standard);
+			    		grantAccess(currentPacketSeq, false, clientIP, Utilities.ALREADY_LOGGED, studentName, standard);
 			    	}
 		    	}
 		    	else
@@ -169,7 +182,7 @@ public class StudentLogin extends Thread{
 		    		/*
 		    		 * Student request is new, Add an entry into the list, and send an ack to him
 		    		 */
-		    		grantAccess(true, clientIP, Utilities.NO_ERROR, studentName, standard);
+		    		grantAccess(currentPacketSeq, true, clientIP, Utilities.NO_ERROR, studentName, standard);
 		    		addStudent(clientIP,auth_packet.userID, studentName);
 		    	}
 		    }
@@ -179,9 +192,16 @@ public class StudentLogin extends Thread{
 		    	 * Entered credentials by the student didn't match with any of the records in the database
 		    	 * Send him -ve reply
 		    	 */
-		    	grantAccess(false,clientIP, Utilities.INVALID_USER_PASS, studentName, (byte)0);
+		    	grantAccess(currentPacketSeq, false,clientIP, Utilities.INVALID_USER_PASS, studentName, (byte)0);
 		    }
 		}
+                catch( SocketTimeoutException ste )
+                {
+                    /*
+                        Listen again
+                    */
+                        continue;
+                }
 		catch (SocketException e)
 		{
 			e.printStackTrace();
@@ -190,6 +210,7 @@ public class StudentLogin extends Thread{
 		{
 			e.printStackTrace();
 		}
+            }
 	}
         
         private boolean changePassword(String uid, String old_pass, String new_pass )
@@ -215,7 +236,7 @@ public class StudentLogin extends Thread{
             return false;
         }
 	
-	private void grantAccess(boolean flag,InetAddress clientIP, byte errorCode, String name, byte standard)
+	private void grantAccess(int currentPacketSeq, boolean flag,InetAddress clientIP, byte errorCode, String name, byte standard)
 	{
 		AuthPacket ap = null;
 		if( flag == false )
@@ -232,7 +253,7 @@ public class StudentLogin extends Thread{
 		ap.studentName = name;
                 ap.standard = standard;
                 
-		Packet p = new Packet(PacketSequenceNos.AUTHENTICATION_SEND_SERVER,true,false,false,Utilities.serialize(ap));
+		Packet p = new Packet(currentPacketSeq, PacketTypes.AUTHENTICATION_LOGIN, true, Utilities.serialize(ap));
 		
 		byte[] buf = Utilities.serialize(p);
 		
@@ -305,20 +326,11 @@ public class StudentLogin extends Thread{
 	{
 		for(Student s : studentsList)
 		{
-			if( s.uID.equals(new String(id)))
+			if( s.uID.equals(id))
 			{
 				return s;
 			}
 		}
 		return null;
-	}
-        
-	public void run()
-	{
-		/* Authenticate the students */
-		while(true)
-		{
-			receiveAuthPackets();
-		}
 	}
 }

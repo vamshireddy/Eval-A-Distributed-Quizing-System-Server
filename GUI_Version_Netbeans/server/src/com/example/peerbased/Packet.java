@@ -6,7 +6,7 @@ public class Packet implements Serializable{
 	static final long serialVersionUID = 42L;
 	int seq_no; 			// This will be the packet identifier
 	byte type;
-	boolean auth_packet;	// This flag will be set, if the packet is used for authentication of student or teacher
+	//boolean auth_packet;	// This flag will be set, if the packet is used for authentication of student or teacher
 	boolean bcast;			// This flag will be set, if the packet is a broadcast packet . Usually set by the sender
 	boolean probe_packet;	// Used when the packet is used for probing the status of the android devices (students)
 	boolean param_packet;
@@ -23,7 +23,7 @@ public class Packet implements Serializable{
 		ack = false;
 		type = -1;
 		seq_no = 0;
-		auth_packet = false;
+		//auth_packet = false;
 		bcast = false;
 		probe_packet = false;
 		data = null;
@@ -35,7 +35,7 @@ public class Packet implements Serializable{
 	public Packet(int seq_no, boolean auth, boolean bcast, boolean probe, byte[] data) {
 		this();
 		this.seq_no = seq_no;
-		this.auth_packet = auth;
+		//this.auth_packet = auth;
 		this.bcast = bcast;
 		this.probe_packet = probe;
 		this.data = data;
@@ -55,5 +55,12 @@ public class Packet implements Serializable{
 		this(seq_no, auth, bcast, probe, data, param_pack, leader_pack);
 		team_selection_packet = team_Sel;
 		group_name_selection_packet = grp_name_req;
+	}
+	public Packet(int seq_no, byte type, boolean ack, byte[] data)
+	{
+		this.seq_no = seq_no;
+		this.type = type;
+		this.ack = ack;
+		this.data = data;
 	}
 }

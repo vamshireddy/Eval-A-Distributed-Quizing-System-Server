@@ -450,7 +450,7 @@ public class Quiz extends Thread
 				}
                                 
                                 
-				HashMap<String,Integer> stats = getResponses(questionSeqNo, questionFormed);  
+				HashMap<String,Double> stats = getResponses(questionSeqNo, questionFormed);  
 				/*
 				 * Calculate the marks according to the level
 				 */
@@ -470,7 +470,7 @@ public class Quiz extends Thread
                 QuizStats qstat = new QuizStats();
                 qstat.setVisible(true);
                 /*
-                Quiz is completed. Send results
+                    Quiz is completed. Send results
                 */
                 Packet packy = new Packet(Utilities.seqNo, false, true, false,null, true);
                 packy.type = PacketTypes.QUIZ_END_PACKET;
@@ -510,11 +510,15 @@ public class Quiz extends Thread
                         }
                 }
                 /*
+                    Show bar chart about groups.
+                */
+                
+                /*
                     Show the Home Page GUI
                 */
 	}
         
-        private void showQuestionStats(HashMap<String,String> questionFormed, HashMap<String,Integer> stats)
+        private void showQuestionStats(HashMap<String,String> questionFormed, HashMap<String,Double> stats)
         {
             /*
                 Display GUI 
@@ -568,7 +572,6 @@ public class Quiz extends Thread
                 {
                     s.marks = s.marks + questionLevel;
                 }
-                
                 /*
                     Print
                 */
@@ -580,13 +583,13 @@ public class Quiz extends Thread
 		}
 	}
 	
-	private HashMap<String,Integer> getResponses(int qseq_no, HashMap<String,String> questionFormed)
+	private HashMap<String,Double> getResponses(int qseq_no, HashMap<String,String> questionFormed)
 	{
                 /*
                     Start the GUI for the reponse listening
                 */
                 
-                HashMap<String,Integer> stats = new HashMap<>();
+                HashMap<String,Double> stats = new HashMap<>();
                 
                 String answer = questionFormed.get("answer");
                 
@@ -776,19 +779,22 @@ public class Quiz extends Thread
                 {
                     case 1 :   for(int i=0;i<4;i++)
                                {
-                                   stats.put(responseOptions[i],responseCount[i]);
+                                   double a = ((float)responseCount[i]/studentsList.size())*100;
+                                   stats.put(responseOptions[i],a);
                                }
                                break;
                         
                     case 2  :  for(int i=0;i<2;i++)
                                {
-                                   stats.put(responseOptions[i],responseCount[i]);
+                                   double a = ((float)responseCount[i]/studentsList.size())*100;
+                                   stats.put(responseOptions[i],a);
                                }
                                break;
                         
                     case 3  :  for(int i=0;i<2;i++)
                                {
-                                   stats.put(responseOptions[i],responseCount[i]);
+                                   double a = ((float)responseCount[i]/studentsList.size())*100;
+                                   stats.put(responseOptions[i],a);
                                }
                                break;
                 }

@@ -22,7 +22,7 @@ public class Utilities {
 	public static int seqNo = 150;
 	
 	// Constants
-	public static final int MAX_BUFFER_SIZE = 1024;
+	public static final int MAX_BUFFER_SIZE = 1500;
 	public static final int MAX_LENGTH_OF_DATA = 100;
 	private static ByteArrayInputStream bais;
 	private static ObjectInputStream ois;
@@ -62,7 +62,7 @@ public class Utilities {
 	{
 		Object result = null;
 	    try {
-	    	bais = new ByteArrayInputStream(buffer);
+                        bais = new ByteArrayInputStream(buffer);
 			ois = new ObjectInputStream(bais);
 			result = ois.readObject();
 		} catch (IOException e) {

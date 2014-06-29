@@ -95,7 +95,7 @@ public class ResponseStatistics extends javax.swing.JFrame {
         });
     }
 
-    private  PieDataset createDatasetMultipleChoice(HashMap<String,Integer> hm) {
+    private  PieDataset createDatasetMultipleChoice(HashMap<String,Double> hm) {
         DefaultPieDataset result = new DefaultPieDataset();
    
         Set<String> set = hm.keySet();
@@ -109,7 +109,7 @@ public class ResponseStatistics extends javax.swing.JFrame {
         
     }
     
-    private  PieDataset createDatasetOneWord(HashMap<String,Integer> hm) {
+    private  PieDataset createDatasetOneWord(HashMap<String,Double> hm) {
         DefaultPieDataset result = new DefaultPieDataset();
         
         Set<String> set = hm.keySet();
@@ -124,13 +124,17 @@ public class ResponseStatistics extends javax.swing.JFrame {
         
     }
     
-    private  PieDataset createDatasetTrueOrFalse(HashMap<String,Integer> hm) {
+    private  PieDataset createDatasetTrueOrFalse(HashMap<String,Double> hm) {
         DefaultPieDataset result = new DefaultPieDataset();
 
         Set<String> set = hm.keySet();
         
         for( String s : set )
         {
+            /*
+                Convert into %
+            */
+            
             result.setValue(s, hm.get(s));
         }
         
@@ -138,7 +142,7 @@ public class ResponseStatistics extends javax.swing.JFrame {
         
     }
     
-    public void InitChart(String question, HashMap<String,Integer> hm, int type)
+    public void InitChart(String question, HashMap<String,Double> hm, int type)
     {
         /*
             True or false or One word based on the flag

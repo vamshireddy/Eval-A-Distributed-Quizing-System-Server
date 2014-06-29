@@ -49,6 +49,9 @@ class StartSession {
 		 */
 		StudentLogin sl = new StudentLogin(databaseConnection);
 		sl.start();
+                /*
+                    MultiThreaded TCP server for handling performance, reports , questions, etc
+                */
                 TCPServer tcps = new TCPServer(databaseConnection);
                 tcps.start();
 	}

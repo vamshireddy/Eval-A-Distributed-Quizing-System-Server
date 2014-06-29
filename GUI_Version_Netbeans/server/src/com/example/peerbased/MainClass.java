@@ -21,8 +21,6 @@ public class MainClass {
 		 */
 		try 
 		{
-//                        ResponseStatistics s = new ResponseStatistics();
-//                        s.setVisible(true);
 			Class.forName("com.mysql.jdbc.Driver");
 			Connection con = (Connection)DriverManager.getConnection("jdbc:mysql://localhost:3306/quizAppNew","root","reddy123");
 			/*
