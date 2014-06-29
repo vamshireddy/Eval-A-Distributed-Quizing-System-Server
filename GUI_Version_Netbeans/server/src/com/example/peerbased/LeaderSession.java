@@ -98,12 +98,14 @@ public class LeaderSession extends Thread{
 		/* Get leader requests */
                 waitPageGUI wp = new waitPageGUI();
                 wp.setText("Please wait untill leaders give their requests");
+                
                 LeaderSessionWait lsw = new LeaderSessionWait();
                 lsw.setVisible(false);
                 
                 DisplayLeaders dl = null;
                 
                 wp.setVisible(true);
+                
 		while(true)
 		{
                         
@@ -142,8 +144,10 @@ public class LeaderSession extends Thread{
                                     lsw.resetWait();
                                     lsw.setVisible(false);
                                     wp.setVisible(true);
-				continue;
+                                    continue;
+                                    
                                 }
+                                
                                 lsw.setVisible(false);
 				String leaders = printLeaders();
                                 dl = new DisplayLeaders(leaders);
@@ -151,6 +155,9 @@ public class LeaderSession extends Thread{
 				break;
 			}
 		}
+                /*
+                    Create a structure for groups
+                */
 		groups = new ArrayList<Group>(noOfGroups);
 		broadCastLeaders();
 		// Now receive the group name requests from leaders and the leader selection requests from the other students
@@ -234,12 +241,16 @@ public class LeaderSession extends Thread{
 
                     System.out.println("Got a packet outside!!!!");
                     Packet p = (Packet)Utilities.deserialize(b);
-                    if( p.group_name_selection_packet == true && p.seq_no == PacketSequenceNos.GROUP_REQ_CLIENT_SEND )
+                    
+                    int rcvdSeqNo = p.seq_no;
+                    
+                    if( p.type == PacketTypes.GROUP_NAME_SELECTION && p.ack == false )
                     {
                             System.out.println("Got a packet!!!!");
+                            
                             GroupNameSelectionPacket gnsp = (GroupNameSelectionPacket)Utilities.deserialize(p.data);
 
-                            if( gnsp.accepted == false  )
+                            if( gnsp.accepted == false )
                             {
                                     System.out.println("Its group name request!!");
                                     /*
@@ -251,14 +262,12 @@ public class LeaderSession extends Thread{
                                             /*
                                              * Send reply
                                              */
-                                            sendGroupSelectAck(true, gnsp.groupName, gnsp.studentName, gnsp.studentID, clientIP);
+                                            sendGroupSelectAck(true, clientIP, rcvdSeqNo);
                                             continue;
                                     }
                                     // Add the group name
-                                    int gsize = groups.size();
-                                    for( int i=0;i<gsize;i++ )
+                                    for(Group g : groups)
                                     {
-                                            Group g = groups.get(i);
                                             if( g.leaderID.equals(gnsp.studentID) )
                                             {
                                                     g.groupName = gnsp.groupName;
@@ -268,13 +277,14 @@ public class LeaderSession extends Thread{
                                     /*
                                      * Send reply
                                      */
-                                    sendGroupSelectAck(true, gnsp.groupName, gnsp.studentName, gnsp.studentID, clientIP);
+                                    sendGroupSelectAck(true, clientIP, rcvdSeqNo);
                             }
                     }
-                    else if( p.team_selection_packet == true && p.seq_no == PacketSequenceNos.TEAM_REQ_CLIENT_SEND )
+                    else if( p.type == PacketTypes.TEAM_SELECTION && p.ack == false )
                     {
                             TeamSelectPacket tsp = (TeamSelectPacket)Utilities.deserialize(p.data);
-                            String clientName = tsp.name;
+                            
+                            //String clientName = tsp.name;
                             String clientID = tsp.ID;
                             String leaderID = tsp.leaderID;
 
@@ -290,12 +300,11 @@ public class LeaderSession extends Thread{
                                              * This will happen only when the student's previous request was valid.
                                              */
                                             System.out.println("Redundant request!!");
+                                            sendTeamSelectAck(true,clientIP, rcvdSeqNo);
                                             continue;
                                     }
-                                    int gsize = groups.size();
-                                    for( int i=0;i<gsize;i++ )
+                                    for(Group g : groups)
                                     {
-                                            Group g = groups.get(i);
                                             if( g.leaderID.equals(leaderID) )
                                             {
                                                     if( g.teamMembers.size() >= groupSize )
@@ -304,16 +313,15 @@ public class LeaderSession extends Thread{
                                                              * If the request is not valid, Dont add the student to the rcvdRequest list
                                                              * This way he/she will be allowed to select other leader
                                                              */
-                                                            sendTeamSelectAck(false,clientIP, clientID, clientName, leaderID);
-                                                            continue;
+                                                            sendTeamSelectAck(false,clientIP, rcvdSeqNo);
+                                                            break;
                                                     }
                                                     /*
                                                      * The below loop can be optimized!
                                                      * We can avoid iterating through the studentslist, byt creating the record on the go!
                                                      */
-                                                    for(int j=0;j<studentsList.size();j++)
+                                                    for( Student s: studentsList)
                                                     {
-                                                            Student s = studentsList.get(j);
                                                             if( s.uID.equals(clientID) )
                                                             {
                                                                     g.teamMembers.add(s);
@@ -321,8 +329,8 @@ public class LeaderSession extends Thread{
                                                                      * Add the student to the rcvdRequest list only if the student request is valid
                                                                      */
                                                                     rcvdReqs.add(new String(clientID));
-                                                                    sendTeamSelectAck(true,clientIP, clientID, clientName, leaderID);
-                                                                    continue;
+                                                                    sendTeamSelectAck(true,clientIP, rcvdSeqNo);
+                                                                    break;
                                                             }
                                                     }
                                             }
@@ -336,11 +344,15 @@ public class LeaderSession extends Thread{
 	    }
         }
         
-	private void sendGroupSelectAck(boolean flag, String groupName, String uName, String uID, InetAddress ip)
+	private void sendGroupSelectAck(boolean flag, InetAddress ip, int rcvdSeqNo)
 	{
-		GroupNameSelectionPacket gsp = new GroupNameSelectionPacket(groupName, uID, uName);
-		gsp.accepted = flag;
-		Packet p = new Packet(PacketSequenceNos.GROUP_REQ_SERVER_ACK, false, false, false, Utilities.serialize(gsp), false, false, false, true);
+                /*
+                    Send an Ack
+                */
+		GroupNameSelectionPacket gsp = new GroupNameSelectionPacket(flag);
+
+		Packet p = new Packet(rcvdSeqNo, PacketTypes.GROUP_NAME_SELECTION,true , Utilities.serialize(gsp));
+                
 		byte[] bytes = Utilities.serialize(p);
 		
 		System.out.println("\nSENTTT\n");
@@ -354,11 +366,12 @@ public class LeaderSession extends Thread{
 		}
 	}
 	
-	private void sendTeamSelectAck(boolean flag, InetAddress ip, String clientID, String clientName, String leaderID)
+	private void sendTeamSelectAck(boolean flag, InetAddress ip, int rcvdSeqNo)
 	{
-		TeamSelectPacket tsp = new TeamSelectPacket(leaderID, clientName, clientID);
-		tsp.accepted = flag;
-		Packet p = new Packet(PacketSequenceNos.TEAM_REQ_SERVER_ACK, false, false, false, Utilities.serialize(tsp), false, false, true, false);
+		TeamSelectPacket tsp = new TeamSelectPacket(flag);
+                
+		Packet p = new Packet(rcvdSeqNo, PacketTypes.TEAM_SELECTION, true, Utilities.serialize(tsp));
+                
 		byte[] bytes = Utilities.serialize(p);
 		
 		DatagramPacket pack = new DatagramPacket(bytes, bytes.length, ip, Utilities.clientPort);
@@ -375,37 +388,29 @@ public class LeaderSession extends Thread{
 		/* 
 		 * This function broadcast's the leaders to the students ( who are not leaders ) and sends a groupname request to leaders
 		 */
-		int lsize = leaderRequests.size();
-		int ssize = studentsList.size();
 		
-		for( int i=0;i<lsize;i++ )
+		for( Leader l : leaderRequests)
 		{
-			Leader l = leaderRequests.get(i);
-			for(int j=0;j<ssize;j++)
+			for(Student s : studentsList)
 			{
-				if( studentsList.get(j).uID.equals(l.id) ) 
+				if(s.uID.equals(l.id) ) 
 				{
 					// Add the leader name 
-					Student s = studentsList.get(j);
 					l.name = s.name;
-		
-					// Make a new group entry 
+					// Make a new group entry
 					groups.add(new Group("",s.name, s.uID, s));
 					System.out.println("Added a group!");
-					
-					
-					sendLeaderMessage(s.IP);
+
+					sendLeaderMessage(s.IP,s.name);
 					System.out.println("Sent leader group request to "+s.name+"!!!");
 				}
 			}
 		}
-		for( int i=0;i<ssize;i++ )
-		{
-			Student s = studentsList.get(i);
+		for(Student s: studentsList)
+                {
 			boolean flag = true;
-			for( int j=0;j<lsize;j++ )
-			{
-				Leader l = leaderRequests.get(j);
+			for(Leader l : leaderRequests)
+                        {
 				System.out.println("I am inside...........ids are "+s.uID+" "+l.id);
 				if(l.id.equals(s.uID))
 				{
@@ -414,34 +419,32 @@ public class LeaderSession extends Thread{
 			} 
 			if( flag == true )
 			{
-				sendElectedLeaders(leaderRequests, s.IP);
+				sendElectedLeaders(leaderRequests, s.IP,s.name);
 				System.out.println("Sent online Leaders to "+s.uID+"!!!");
 			}
 		}
 	}
 	
 
-	private void sendElectedLeaders(ArrayList<Leader> leaders, InetAddress IP) {
+	private void sendElectedLeaders(ArrayList<Leader> leaders, InetAddress IP, String name) {
 		/*
 		 * Send the leaders to everyone except the leader students
-		 */
+		 */  
 		// TODO can add strict check's at the client by sending the userName and ID. That will be validated at the client side
 		LeaderPacket lp = new LeaderPacket();
 		lp.LeadersListBroadcast = true; // This is flag to differentiate the list packet for non-leaders and group name selection packet for leaders
 		lp.leaders = leaders;			// Add the leaders
 		
-		Packet sendPacky = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(lp), false, true);
-		sendPacky.ack = false;
-		sendPacky.type = PacketTypes.LEADER_SCREEN_CHANGE;
+		Packet sendPacky = new Packet(Utilities.seqNo,PacketTypes.LEADER_SCREEN_CHANGE,false ,Utilities.serialize(lp));
 		
-		Quiz.sendToClient_Reliable(sendSock, recvSock, IP, sendPacky);
+		UDPReliableHelperClass.sendToClientReliableWithGUI(sendSock, recvSock, IP, sendPacky, name);
 	}
 	
 	
 	/*
 	 * Uses reliable UDP
 	 */
-	private void sendLeaderMessage(InetAddress IP)
+	private void sendLeaderMessage(InetAddress IP,String name)
 	{
 		
 		// TODO can add strict check's at the client by sending the userName and ID. That will be validated at the client side
@@ -457,13 +460,11 @@ public class LeaderSession extends Thread{
 		lp.grpNameRequest = true;
 		
 		
-		Packet sendPacky = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(lp), false, true);
-		sendPacky.ack = false;
-		sendPacky.type = PacketTypes.LEADER_SCREEN_CHANGE;
+		Packet sendPacky = new Packet(Utilities.seqNo, PacketTypes.LEADER_SCREEN_CHANGE, false, Utilities.serialize(lp));
 		/*
 		 * For receiving the packet
 		 */
-		Quiz.sendToClient_Reliable(sendSock, recvSock, IP, sendPacky);
+		UDPReliableHelperClass.sendToClientReliableWithGUI(sendSock, recvSock, IP, sendPacky, name);
 	}
 	
 	
@@ -488,7 +489,7 @@ public class LeaderSession extends Thread{
 				continue;
 			}
 			Packet p = (Packet)Utilities.deserialize(b);
-			if( p.leader_req_packet == true && p.seq_no == PacketSequenceNos.LEADER_REQ_CLIENT_SEND )
+			if( p.type == PacketTypes.LEADER_REQUEST && p.ack == false )
 			{
 				System.out.println("Received a request!");
 				addRequestAndSendReply(p, pack.getAddress());
@@ -497,40 +498,47 @@ public class LeaderSession extends Thread{
 	}
 	public void addRequestAndSendReply(Packet p, InetAddress IPadd)
 	{
+                        int currentRcvdSeq = p.seq_no;
+                        
 			LeaderPacket lp = (LeaderPacket)Utilities.deserialize(p.data);	
 			
 			if( isPresentInLeaderReqs(lp.uID) )
 			{
+                                System.out.println("Already present");
 				// If the student is present in the list, send him postive reply
-				grantRequest(true, IPadd);
+				grantRequest(true, IPadd, currentRcvdSeq);
 				return;
 			}
 			else
 			{
+                                System.out.println("Not present");
 				if( leaderRequests.size() >= noOfGroups )
 				{
-					grantRequest(false, IPadd);
+                                        System.out.println("More than what is required");
+					grantRequest(false, IPadd, currentRcvdSeq);
 					return;
 				}
 				if( lp.granted == false )
 				{
+                                        System.out.println("True one adding");
 					System.out.println("luid = "+lp.uID+" name : "+lp.uName);
 					addRequest(new Leader(lp.uName, lp.uID));
-					grantRequest(true, IPadd);
+					grantRequest(true, IPadd, currentRcvdSeq);
 				}
 				else
 				{
-					grantRequest(false, IPadd);
+                                        System.out.println("Erroneous packet");
+					grantRequest(false, IPadd, currentRcvdSeq);
 				}
 			}
 	}
 	
-	public void grantRequest(boolean flag, InetAddress IP)
+	public void grantRequest(boolean flag, InetAddress IP, int rcvdSeqNo)
 	{
 		LeaderPacket lp = new LeaderPacket();
 		lp.granted = flag;
-		Packet p = new Packet(PacketSequenceNos.LEADER_REQ_SERVER_SEND, false, false, false, Utilities.serialize(lp), false, true);
-		p.leader_req_packet = true;
+                
+		Packet p = new Packet(rcvdSeqNo,PacketTypes.LEADER_REQUEST,true, Utilities.serialize(lp));
 		
 		byte[] ba = Utilities.serialize(p);
 		
@@ -548,13 +556,10 @@ public class LeaderSession extends Thread{
 	}
 	public boolean addRequest(Leader s)
 	{
-		for(int i=0;i<noOfGroups;i++)
-		{
-			if(leaderRequests.contains(s))
-			{
-				return true;
-			}
-		}
+                if(leaderRequests.contains(s))
+                {
+                        return true;
+                }
 		System.out.println("User added!");
 		leaderRequests.add(s);
 		return false;
@@ -562,9 +567,9 @@ public class LeaderSession extends Thread{
 	public String printLeaders()
 	{
                 String leaderString = "";
-		for(int i=0;i<leaderRequests.size();i++)
-		{
-			leaderString = leaderString + "Leader "+(i+1)+" : "+leaderRequests.get(i).name+"\n";
+		for(Leader l : leaderRequests)
+                {
+			leaderString = leaderString + "Leader "+" : "+l.name+"\n";
 		}
                 return leaderString;
 	}
@@ -573,9 +578,9 @@ public class LeaderSession extends Thread{
 	{
                 String grpString = "";
 		System.out.println("The groups are : ");
-		for(int i=0;i<groups.size();i++)
-		{
-			Group g = groups.get(i);
+		
+                for( Group g : groups)
+                {
 			grpString = grpString + "GroupName: "+g.groupName+"\n"+"Leader: "+g.leaderName+"\n";
                         System.out.println("GroupName: "+g.groupName+"\n"+"Leader: "+g.leaderName+"\n");
 			for(int j=0;j<g.teamMembers.size();j++)
@@ -590,10 +595,9 @@ public class LeaderSession extends Thread{
 	
 	private boolean isPresentInLeaderReqs(String id)
 	{
-		for(int i=0;i<leaderRequests.size();i++)
-		{
-			Leader l = leaderRequests.get(i);
-			if( l.id.equals(id) )
+		for(Leader l : leaderRequests)
+                {
+                        if( l.id.equals(id) )
 			{
 				return true;
 			}

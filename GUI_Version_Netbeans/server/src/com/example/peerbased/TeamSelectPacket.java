@@ -16,5 +16,12 @@ public class TeamSelectPacket implements Serializable {
 		name = studentName;
 		ID = studentID;
 		accepted = false;
-	}	
+	}
+        public TeamSelectPacket(boolean b)
+	{
+		leaderID = null;
+		name = null;
+		ID = null;
+		accepted = b;
+	}
 }

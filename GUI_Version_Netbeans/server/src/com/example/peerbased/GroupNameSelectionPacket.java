@@ -16,4 +16,11 @@ public class GroupNameSelectionPacket implements Serializable{
 		studentID = studID;
 		studentName = studName;
 	}
+        public GroupNameSelectionPacket(boolean flag)
+        {
+            groupName = null;
+            studentID = null;
+            studentName = null;
+            accepted = flag;
+        }
 }

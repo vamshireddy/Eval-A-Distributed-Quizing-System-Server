@@ -253,6 +253,7 @@ public class StudentLogin extends Thread{
 		ap.studentName = name;
                 ap.standard = standard;
                 
+                System.out.println("Sending seq no "+currentPacketSeq);
 		Packet p = new Packet(currentPacketSeq, PacketTypes.AUTHENTICATION_LOGIN, true, Utilities.serialize(ap));
 		
 		byte[] buf = Utilities.serialize(p);

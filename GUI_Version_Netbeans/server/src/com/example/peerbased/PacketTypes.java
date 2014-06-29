@@ -15,4 +15,13 @@ public class PacketTypes {
 	 */
 	public static final byte AUTHENTICATION_LOGIN = 10;
         public static final byte AUTHENTICATION_CHANGE_PASS = 11;
+        /*
+        * Leader session
+         */
+        public static final byte LEADER_REQUEST = 12;
+        /*
+            Group Session
+        */
+        public static final byte GROUP_NAME_SELECTION = 13;
+        public static final byte TEAM_SELECTION = 14;
 }

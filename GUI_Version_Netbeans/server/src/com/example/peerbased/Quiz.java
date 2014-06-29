@@ -10,6 +10,7 @@ import GUI.QuizStats;
 import GUI.QuizTestStartPage;
 import GUI.ResponseStatistics;
 import GUI.ResponseWait;
+import GUI.RetryPacketSend;
 import GUI.TrueOrFalseFrame;
 import GUI.waitPageGUI;
 import QuizPackets.*;
@@ -31,6 +32,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -81,6 +83,7 @@ public class Quiz extends Thread
         private LevelFrame lf;
         private ResponseWait rw;
         private QuestionTimeExtension ext;
+        public static RetryPacketSend rps;
         
 	/* Constructor */
 	public Quiz(String subject,String teacherName, Connection c)
@@ -98,6 +101,7 @@ public class Quiz extends Thread
                 rw = new ResponseWait();
                 ext = new QuestionTimeExtension();
                 qwp = new QuestionWaitPage();
+                rps = new RetryPacketSend();
                 /*
                     GUI FRAME INITIALIZATION
                 */
@@ -129,7 +133,7 @@ public class Quiz extends Thread
                 /*
                     Get the parametere from the GUI and set it
                 */
-                setParameters(qsp.getStudents(), qsp.getGroups(), qsp.getStudentsInGroup(), qsp.getStandard());
+                setParameters(qsp.getRounds(), qsp.getStudents(), qsp.getGroups(), qsp.getStudentsInGroup(), qsp.getStandard());
                 
                 System.out.println("Got parameters studets:"+noOfStudents+"\n");
 		/* Initialize the parameters which are passed from the previous class */
@@ -139,8 +143,7 @@ public class Quiz extends Thread
 		this.studentsList = StudentListHandler.getList();
 		this.questions = new ArrayList<>();
 		// Set the student list hadler so that all classes can access it!
-		
-		
+
 		try {
 			sendSocket = new DatagramSocket();
 			recvSocket = new DatagramSocket(null);
@@ -161,22 +164,16 @@ public class Quiz extends Thread
                 qsp.setVisible(false);
 	}
         
-        public void setParameters(byte students, byte groups, byte studentsingroup, String standard)
+        public void setParameters(byte rounds, byte students, byte groups, byte studentsingroup, String standard)
         {
                 System.out.println(" setting students  = "+students);
                 noOfGroups = groups;
                 noOfStudents = students;
+                noOfRounds = rounds;
                 noOfStudentsInGroup = studentsingroup;
                 this.standard = standard;
         }
-	
-        private InetAddress getBroadcastIP()
-	{
-		/* Get it from the interface */
-		// To be filled
-		return null;
-	}
-	
+        
         
 	/* This is the method which performs the crucial function of this class */
 	public void startQuizSession()
@@ -241,38 +238,62 @@ public class Quiz extends Thread
                     wp.setVisible(true);
                     wp.setText("Please wait");
                 }
-                /* GUI PART */
-		
-		for(int i=0;i<studentsList.size();i++)
+  
+                /*
+                    QUIZ START
+                    Send the Quiz Start Page to all the students in the class
+                    If any student goes out of the network and can't be reachable, then the server should have an option of removing his record or try sending to him again
+                */
+                
+                /*
+                    Iterator used for removing the record dynamically
+                */
+                Iterator<Student> iterator = studentsList.iterator();
+                
+		while( iterator.hasNext() )
 		{
 			/*
-			 * For sending the packet
+			 * For sending the packet which contains the description of the Quiz
 			 */
 			ParameterPacket param_pack = new ParameterPacket(noOfStudents, noOfGroups, noOfStudentsInGroup, noOfRounds, subject);
-			Packet packy = new Packet(Utilities.seqNo, false, true, false,Utilities.serialize(param_pack), true);
-			
-			packy.type = PacketTypes.QUIZ_TURN_SCREEN;
-			packy.ack = false;
+                        
+                        System.out.println("\nSEQ : "+Utilities.seqNo+"\n");
+                        
+			Packet packy = new Packet(Utilities.seqNo,PacketTypes.QUIZ_TURN_SCREEN, false, Utilities.serialize(param_pack));
+                        
 			/*
 			 * For receiving the packet
 			 */
-			Student s = studentsList.get(i);
+                        
+			Student s = iterator.next();
+                        
 			System.out.println("\nI am sending to "+s.name+"\n");
                         
-			if( sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy) == -1 )
-			{
-				System.out.println("Client couldn't connect");
-				System.exit(0);
-			}
+                        if( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket,  recvSocket, s.IP, packy, s.name) == false )
+                        {
+                            iterator.remove();                     
+                            System.out.println("Removed "+s.name);
+                        }
 		}
 		
+                if( studentsList.size() <= 0 )
+                {
+                    /*
+                        Quiz quitting due to insufficient no of students
+                        GO to HomePage
+                    */
+                    System.out.println("System quitting due to insufficient no of students");
+                    System.exit(0);
+                }
+                
+                
                 wp.setText("Sent Configuration Parameters to everyone in the network!");
 		System.out.println("-----------------------------------------------\nSent Configuration Parameters to everyone in the network!");
 		
                 /*
 		 * Start leader Session
 		 */
-		cleanBuffer();
+		UDPReliableHelperClass.cleanBuffer(recvSocket);
 		/* Clean the server buffer before starting the leader session, so that all the previous unnecessary packets are discarded! */
 		
                 wp.setVisible(false);
@@ -282,18 +303,16 @@ public class Quiz extends Thread
 		/*
 		 *  Leader session ends
 		 */
-		cleanBuffer();
+		UDPReliableHelperClass.cleanBuffer(recvSocket);
 		
 		/*
 		 * Get the data structure of groups from the leader session object
 		 */
 		groups = ls.getGroups();
 		
-                
-                
-//		System.out.println("\nEnter any key to Start the quiz\n");
-//		
-//		int a = Utilities.scan.nextInt();
+                /*
+                    From Now on use Groups. Dont use Student's list as some new students may enter into student's list in the middle
+                */
 
 		sendGroupsToStudents(groups);
                 /*
@@ -320,81 +339,15 @@ public class Quiz extends Thread
                     }
                 }
                 qtsp.setVisible(false);
-                noOfRounds = qtsp.getRounds();
                 questionTimelimitInSeconds = qtsp.getQuesTime();
                 AnswerTimeLimitInSeconds = qtsp.getAnsTime();
                 
 		startQuiz();
 		
 	}
-	
-	public static int sendToClient_Reliable(DatagramSocket sendSock, DatagramSocket recvSock, InetAddress IP, Packet packy)
-	{
-		boolean ackFlag = false;
-		
-		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
-		DatagramPacket recvPacky = new DatagramPacket(b, b.length);
-		
-		for(int j=0;j<Utilities.noOfAttempts;j++)
-		{
-			System.out.println("Attempt "+(j+1));
-			sendDatagramPacket(sendSock, IP, Utilities.clientPort, packy);
-			/*
-			 * Now try to receive the ack
-			 */
-			while( true )
-			{
-				try {
-					recvSock.receive(recvPacky);
-				}
-				catch ( SocketTimeoutException ste )
-				{
-					System.out.println("Timeout!");
-					break;
-				}
-				catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-					System.exit(0);
-				}
-				/*
-				 * Now check whether the recvd packet seqNo is matching
-					Utilities.seqNo++;		 */
-				Packet recvPacket = (Packet)Utilities.deserialize(b);
-				if( recvPacket.seq_no == Utilities.seqNo && recvPacket.ack == true )
-				{
-					System.out.println("I got a reply from client "+recvPacky.getAddress());
-					ackFlag = true;
-					/*
-					 * Got reply
-					 */
-					break;
-				}
-				else
-				{
-					System.out.println("I got a packet from client "+recvPacky.getAddress()+" But its something else");
-					continue;
-				}
-			}
-			
-			if( ackFlag == true )
-			{
-				/*
-				 * Get out of this place
-				 */
-				Utilities.seqNo++;
-				return Utilities.SUCCESS;
-			}	
-			/*
-			 * If it is false, then it will continue
-			 */
-		}
-		/*
-		 * No reply from the client, get out of this place
-		 */
-		Utilities.seqNo++;
-		return Utilities.FAIL;
-	}
+        
+        
+
 	
 	private void startQuiz()
 	{
@@ -402,12 +355,12 @@ public class Quiz extends Thread
 		/*
 		 * Clean the server buffer so that all the previous packets which are accumulated in the buffer are destroyed!
 		 */
-                 
- 
+            
                 qwp.setVisible(true);
+               
             
 		System.out.println("Cleaning the server buffer\n");
-		cleanBuffer();
+		UDPReliableHelperClass.cleanBuffer(recvSocket);
 		
 		int questionSeqNo = 1234;
 		
@@ -463,7 +416,7 @@ public class Quiz extends Thread
                                 showQuestionStats(questionFormed,stats);
                                 
 				questionSeqNo++;
-				cleanBuffer();
+				UDPReliableHelperClass.cleanBuffer(recvSocket);
 			}
 		}
                 
@@ -488,7 +441,7 @@ public class Quiz extends Thread
 			 * For receiving the packet
 			 */
 			System.out.println("\nI am sending to "+s.name+"\n");
-			if( sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy) == -1 )
+			if( UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy) == -1 )
 			{
 				System.out.println("Client couldn't connect");
 				System.exit(0);
@@ -815,7 +768,7 @@ public class Quiz extends Thread
 		rp.result = res;
 		Packet p = new Packet(PacketSequenceNos.QUIZ_RESPONSE_SERVER_ACK, false, false, false, Utilities.serialize(rp));
 		p.quizPacket = true;
-		sendDatagramPacket(sendSocket, ip, Utilities.clientPort, p);
+		UDPReliableHelperClass.sendDatagramPacket(sendSocket, ip, Utilities.clientPort, p);
 	}
 	
         /*
@@ -1086,23 +1039,20 @@ public class Quiz extends Thread
 						 */
 						qp.questionAuthenticated = true;
 						
-						Packet qpack = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(qp));
-						qpack.quizPacket = true;
-						qpack.ack = false;
-						qpack.type = PacketTypes.QUESTION_VALIDITY;
+						Packet qpack = new Packet(Utilities.seqNo, PacketTypes.QUESTION_VALIDITY, true ,Utilities.serialize(qp));
 						
 						/*
 						 * Send to every one in that group
 						 * 1st send to leader, then to every one in that group
 						 */
 						
-						sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
+						UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
 						
 						for(int i=0;i<currentGrp.teamMembers.size();i++)
 						{
 							Student s = currentGrp.teamMembers.get(i);
 							qpack.seq_no = Utilities.seqNo;
-							sendToClient_Reliable(sendSocket, recvSocket,s.IP, qpack);
+							UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,s.IP, qpack);
 						}
 						
 						/*
@@ -1175,7 +1125,7 @@ public class Quiz extends Thread
 							 * Send to the leader of the group
 							 */
 							qpack.seq_no = Utilities.seqNo;
-							if( sendToClient_Reliable(sendSocket, recvSocket,g.leaderRecord.IP, qpack) == Utilities.SUCCESS )
+							if( UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,g.leaderRecord.IP, qpack) == Utilities.SUCCESS )
 							{
 								/*
 								 * If the question is sent successfully then increment the no of questions attempted for the leader
@@ -1189,7 +1139,7 @@ public class Quiz extends Thread
 							{
 								Student stud = g.teamMembers.get(j);
 								qpack.seq_no = Utilities.seqNo;
-								if( sendToClient_Reliable(sendSocket, recvSocket,stud.IP, qpack) == Utilities.SUCCESS )
+								if( UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,stud.IP, qpack) == Utilities.SUCCESS )
 								{
 									/*
 									 * If the question is sent successfully then increment the no of questions attempted for the student
@@ -1214,37 +1164,120 @@ public class Quiz extends Thread
 						qpack.ack = false;
 						qpack.quizPacket = true;
 
-						sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
+						UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
 					}
 				}
 			}
 		}
 	}
 	
-	private void sendInterfacePacketBCast(Group g)
+	private void sendInterfacePacketBCast(Group activeGrp)
 	{
 		/*
-		 * Make group 'g' as the active group and all others as passive 
+		 * Make group 'activeGrp' as the active group and all others as passive 
 		 */
 		
-		QuizInterfacePacket qip = new QuizInterfacePacket(g.groupName, g.leaderID);
-		Packet pack = new Packet(Utilities.seqNo, false, true, false, Utilities.serialize(qip));
+		QuizInterfacePacket qip = new QuizInterfacePacket(activeGrp.groupName, activeGrp.leaderID);
+		Packet pack = new Packet(Utilities.seqNo,PacketTypes.QUIZ_INTERFACE_START_PACKET, false, Utilities.serialize(qip));
 		
 		/*
 		 *  Send the packet
 		 */
-		for(int i=0;i<studentsList.size();i++)
+                /*
+                    Loop through the list for all the groups
+                */
+                Iterator<Group> iter = groups.iterator();
+                
+		while( iter.hasNext() )
 		{
-			pack.seq_no = Utilities.seqNo;
-			pack.ack = false;
-			pack.type = PacketTypes.QUIZ_INTERFACE_START_PACKET;
+                        Group loopGrp = iter.next();
+                        
+                        /* Send to leader */
+                        pack.seq_no = Utilities.seqNo;
+                        
+                        while( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, loopGrp.leaderRecord.IP , pack, loopGrp.leaderRecord.name) == false )
+                        {
+                            /*
+                                If the leader is not reachable, then make next one as leader
+                            */
+                            System.out.println("Leader "+loopGrp.leaderName+" is removed");
+                            loopGrp.leaderRecord = null;
+                            loopGrp.leaderID = null;
+                            loopGrp.leaderName = null;
+                            
+                            /*
+                                Get a new team mate and make him a leader
+                            */
+                           
+                            Student newLeader = loopGrp.teamMembers.remove(0);
+                            
+                            
+                            if( newLeader == null )
+                            {
+                                /*
+                                    Leader is gone and there are no team mates
+                                    Delete the group
+                                */
+                                System.out.println("there is no one in this grp. Group is deleted");
+                                iter.remove();
+                                continue;
+                            }
+                            
+                            System.out.println("Student "+newLeader.name+" is made as a new leader");
+                            
+                            
+                            loopGrp.leaderRecord = newLeader;
+                            loopGrp.leaderID = newLeader.uID;
+                            loopGrp.leaderName = newLeader.name;
+                            
+                        }
+                        
 			
-			Student s = studentsList.get(i);
-			sendToClient_Reliable(sendSocket,recvSocket,s.IP,pack);
+                        /* Now send to team mates */
+                        
+                        /*
+                            Get the iterator and check if the team mates are reached or not.
+                        */
+                        Iterator<Student> innerIter = loopGrp.teamMembers.iterator();
+                        while( innerIter.hasNext() )
+                        {
+                            Student s = innerIter.next();
+                            pack.seq_no = Utilities.seqNo;
+                            
+                            /*
+                                Now perform checking of availabilty
+                            */
+                            
+                            while( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, s.IP , pack, s.name) == false )
+                            {
+                                System.out.println("CLient "+s.name+" is removed");
+                                innerIter.remove();
+                            }
+                        }
 		}
+                printGroups();
 		System.out.println("Sent all the packets !!. Hope the clients interface is changed!!");
 	}
 
+        private String printGroups()
+	{
+                String grpString = "";
+		System.out.println("The groups are : ");
+		
+                for( Group g : groups)
+                {
+			grpString = grpString + "GroupName: "+g.groupName+"\n"+"Leader: "+g.leaderName+"\n";
+                        System.out.println("GroupName: "+g.groupName+"\n"+"Leader: "+g.leaderName+"\n");
+			for(int j=0;j<g.teamMembers.size();j++)
+			{
+                                grpString = grpString + "Student : "+g.teamMembers.get(j).name+"\n";
+				System.out.println("Student : "+g.teamMembers.get(j).name);
+			}
+                        grpString = grpString + "\n";
+		}
+                return grpString;
+	}
+        
 	private void sendGroupsToStudents(ArrayList<Group> grp)
 	{
 		for(int i=0;i<grp.size();i++)
@@ -1266,13 +1299,9 @@ public class Quiz extends Thread
 		SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
 		System.out.println("inside packet size is : "+Utilities.serialize(sgp).length);
 		
-		Packet sendPacky = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(sgp),
-				false, false, true, false);
+		Packet sendPacky = new Packet(Utilities.seqNo,PacketTypes.GROUP_DETAILS_MESSAGE, false, Utilities.serialize(sgp));
 		
-		sendPacky.ack = false;
-		sendPacky.type = PacketTypes.GROUP_DETAILS_MESSAGE;
-		
-		sendToClient_Reliable(sendSocket, recvSocket, leader.IP, sendPacky);
+		UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, leader.IP, sendPacky,leader.name);
 		
 	}
 	
@@ -1282,49 +1311,11 @@ public class Quiz extends Thread
 		{
 			SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
 			System.out.println("inside packet size is : "+Utilities.serialize(sgp).length);
-			Packet p = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(sgp),
-					false, false, true, false);
-			p.type = PacketTypes.GROUP_DETAILS_MESSAGE;
-			p.ack = false;
+			Packet p = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, Utilities.serialize(sgp));
 			
-			sendToClient_Reliable(sendSocket, recvSocket, stud.IP, p);
-		}
-	}
-
-	public void cleanBuffer()
-	{
-		while(true)
-		{
-			byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
-			DatagramPacket p = new DatagramPacket(b, b.length);
-			try {
-				recvSocket.receive(p);
-			}
-			catch( SocketTimeoutException e1)
-			{
-				/*
-				 * This exception occurs when there are no packets for the specified timeout period.
-				 * Buffer is clean!!
-				 */
-                            return;
-			}
-			catch (IOException e) {
-				e.printStackTrace();
-                                
-			}
-		}
-	}
-	
-	public static void sendDatagramPacket(DatagramSocket sock,InetAddress ip, int port, Packet p)
-	{
-		byte[] buff = Utilities.serialize(p);
-		DatagramPacket packet = new DatagramPacket(buff, buff.length, ip, port);
-		try
-		{
-			sock.send(packet);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+                        System.out.println("SENDING TO TEAM MEMBER :"+stud.name);
+                        
+			UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, stud.IP, p,stud.name);
 		}
 	}
 }
