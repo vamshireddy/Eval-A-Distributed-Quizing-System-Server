@@ -395,7 +395,13 @@ public class Quiz extends Thread
 				Group g = groups.get(j);
 				
 				System.out.println("Sending the quiz start packet to the group "+j+" ! ");
-				sendInterfacePacketBCast(g);
+				if( sendInterfacePacketBCast(g) == false )
+                                {
+                                    /*
+                                        The active group has been deleted, So make another one active
+                                    */
+                                    continue;
+                                }
 				/*
 				 * 
 				 * Now receive the questions from active group
@@ -875,11 +881,9 @@ public class Quiz extends Thread
 				packy = (Packet)Utilities.deserialize(b);
 				
 				/*
-				 * Send an ack back now
+				 * Send an ack back now 
 				 */
-				Packet ackPacket = new Packet(PacketSequenceNos.SEQ_NOT_NEEDED, false, false, false, packy.data);
-				ackPacket.type = PacketTypes.QUESTION_ACK;
-				ackPacket.ack = true;
+				Packet ackPacket = new Packet(PacketSequenceNos.SEQ_NOT_NEEDED, PacketTypes.QUESTION_ACK, true, packy.data);
 				
 				byte[] ackPacketBytes = Utilities.serialize(ackPacket);	
 				DatagramPacket ackPackDgram = new DatagramPacket(ackPacketBytes, ackPacketBytes.length,clientIP,Utilities.clientPort);
@@ -896,7 +900,10 @@ public class Quiz extends Thread
 			
                         HashMap<String,String> questionFormed = new HashMap<>();
                         
-			if( packy.seq_no == PacketSequenceNos.QUIZ_QUESTION_PACKET_CLIENT_SEND && packy.quizPacket == true )
+                        /*
+                            Check if the packet is of question type or not. If not reject it and continue listening
+                        */
+			if( packy.type == PacketTypes.QUIZ_QUESTION_ASK && packy.ack == false )
 			{
 				QuestionPacket qp = (QuestionPacket)Utilities.deserialize(packy.data);
 				

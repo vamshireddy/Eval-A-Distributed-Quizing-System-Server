@@ -24,4 +24,8 @@ public class PacketTypes {
         */
         public static final byte GROUP_NAME_SELECTION = 13;
         public static final byte TEAM_SELECTION = 14;
+        /*
+            Question asking session
+        */
+        public static final byte QUIZ_QUESTION_ASK = 15;
 }
