@@ -6,6 +6,7 @@
 
 package com.example.peerbased;
 
+import QuizPackets.QuizInterfacePacket;
 import static com.example.peerbased.Quiz.rps;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -25,6 +26,11 @@ public class UDPReliableHelperClass {
     
         public static void sendToTeamMate_UDP_Reliable(DatagramSocket sendSocket, DatagramSocket recvSocket, Group loopGrp, Packet pack)
         {
+                if( loopGrp.teamMembers.isEmpty() )
+                {
+                    System.out.println("Group Empty\n");
+                    return;
+                }
                 
                 Iterator<Student> innerIter = loopGrp.teamMembers.iterator();
                 
@@ -65,8 +71,14 @@ public class UDPReliableHelperClass {
                     try
                     {
                          newLeader = loopGrp.teamMembers.remove(0);
+                         System.out.println("Size of the team is now "+loopGrp.teamMembers.size());
                     }
-                    catch( ArrayIndexOutOfBoundsException ai )
+                    catch( ArrayIndexOutOfBoundsException aiobe )
+                    {
+                        System.out.println("The group is removed "+loopGrp.groupName);
+                        return false;
+                    }
+                    catch( IndexOutOfBoundsException ai )
                     {
                         System.out.println("The group is removed "+loopGrp.groupName);
                         return false;
@@ -78,7 +90,46 @@ public class UDPReliableHelperClass {
                     loopGrp.leaderRecord = newLeader;
                     loopGrp.leaderID = newLeader.uID;
                     loopGrp.leaderName = newLeader.name;
+                    
+                    /*
+                        Update the packet with new sequence number, leader, and leader ID
+                    */
+                    
+                    if( pack.type == PacketTypes.GROUP_DETAILS_MESSAGE )
+                    {
+                        /*
+                            For displaying the group. In this case if the leader is not reached, then group details get changed
+                        */
+                        
+                        System.out.println("FOrming a new packet");
+                        
+                        SelectedGroupPacket sgp = new SelectedGroupPacket(loopGrp.groupName , loopGrp.leaderRecord, loopGrp.teamMembers);
+                        
+                        pack = new Packet(Utilities.seqNo, pack.type , false, Utilities.serialize(sgp));
+                    }
+                    else if( pack.type == PacketTypes.QUIZ_INTERFACE_START_PACKET )
+                    {
+                        /*
+                            For changing the ID of new leader in the packet
+                        */
+                        
+                        QuizInterfacePacket qipRcvd = (QuizInterfacePacket)Utilities.deserialize(pack.data);
+                        
+                        /*
+                            If the current active group's leader is out, then change the packet or else if other inactive groups's leaders are gone. No need to change as
+                            the active group will be the same and doesnt depend on the other people's crashing.
+                        */
+                        if( qipRcvd.activeGroupName.equals(loopGrp.groupName))
+                        {
+                                                            
+                            QuizInterfacePacket qip = new QuizInterfacePacket(loopGrp.groupName, loopGrp.leaderID);                        
+                            pack = new Packet(Utilities.seqNo, pack.type , false, Utilities.serialize(qip));
+                        }
+                    }
 
+                    pack.seq_no = Utilities.seqNo;
+                    
+                    System.out.println("Sending again to "+loopGrp.leaderName+" and his IP is "+loopGrp.leaderRecord.IP);
                 }
                 return true;
         }
@@ -166,7 +217,7 @@ public class UDPReliableHelperClass {
 				}
 				else
 				{
-					System.out.println("I got a packet from client "+recvPacky.getAddress()+" But its something else");
+					System.out.println("I got a packet from client with seq no "+recvPacket.seq_no+" Expected is "+Utilities.seqNo+" and address "+recvPacky.getAddress()+" But its something else");
 					continue;
 				}
 			}
@@ -191,6 +242,7 @@ public class UDPReliableHelperClass {
         
         public static boolean sendToClientReliableWithGUI(DatagramSocket sendSocket, DatagramSocket recvSocket, InetAddress IP, Packet packy, String name)
         {
+                System.out.println("\nSending to "+name+" \n");
                 while( UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket, IP, packy) == Utilities.FAIL )
                 {
                         System.out.println("Client couldn't connect");

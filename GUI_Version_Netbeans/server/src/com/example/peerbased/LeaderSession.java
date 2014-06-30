@@ -426,7 +426,12 @@ public class LeaderSession extends Thread{
 					// Add the leader name 
 					l.name = s.name;
 					// Make a new group entry
-
+                                        
+                                        /*
+                                            Update the seqNo for every iteration
+                                        */
+                                        sendPacky.seq_no = Utilities.seqNo;
+                                        
 					if( sendLeaderMessage(s.IP,s.name,sendPacky) == false )
                                         {
                                             /*
@@ -486,6 +491,10 @@ public class LeaderSession extends Thread{
 			} 
 			if( flag == true )
 			{
+                                /*
+                                    Sequence number is updated everytime
+                                */
+                                sendPackyTeam.seq_no = Utilities.seqNo;
 				if( sendElectedLeaders(s.IP,s.name,sendPackyTeam) == false )
                                 {
                                     System.out.println("Removing the record of "+s.name);

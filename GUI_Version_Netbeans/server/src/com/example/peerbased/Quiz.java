@@ -1192,8 +1192,10 @@ public class Quiz extends Thread
 		}
 	}
 	
-	private void sendInterfacePacketBCast(Group activeGrp)
+	private boolean sendInterfacePacketBCast(Group activeGrp)
 	{
+                boolean activeRemoveFlag = false;
+                
 		/*
 		 * Make group 'activeGrp' as the active group and all others as passive 
 		 */	
@@ -1201,8 +1203,38 @@ public class Quiz extends Thread
 		Packet pack = new Packet(Utilities.seqNo,PacketTypes.QUIZ_INTERFACE_START_PACKET, false, Utilities.serialize(qip));
 		
 		/*
-		 *  Send the packet
+		 *  Send the packet to active grp first. If it receives the packet, then continue. If none of the active grp members are available, then delete the group
+                    and 
 		 */
+                
+                if( UDPReliableHelperClass.sendToLeader_UDP_Reliable(sendSocket, recvSocket, activeGrp, pack) == false )
+                {
+                    /*
+                        Group is removed due to insufficient students to become leader
+                        Now elete the activeGrp.
+                    */
+                    
+                    Iterator<Group> itDelete = groups.iterator();
+                    
+                    while( itDelete.hasNext() )
+                    {
+                        if( itDelete.next().equals(activeGrp) )
+                        {
+                            /*
+                                Found the grp, Now Deleting the group
+                            */
+                            itDelete.remove();
+                            return false;
+                        }
+                    }
+                    
+                    /*
+                        Return False, so that the next group is given turn
+                    */
+                    System.out.println("Error !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    return false;
+                }
+                
                 /*
                     Loop through the list for all the groups
                 */
@@ -1211,6 +1243,14 @@ public class Quiz extends Thread
 		while( iter.hasNext() )
 		{
                         Group loopGrp = iter.next();
+                        
+                        /*
+                            Skip if active group, as its already been handled.
+                        */
+                        if( loopGrp.equals(activeGrp) )
+                        {
+                            continue;
+                        }
                         
                         /* Send to leader */
                         pack.seq_no = Utilities.seqNo;
@@ -1223,9 +1263,11 @@ public class Quiz extends Thread
                             iter.remove();
                             continue;
                         }
-                        
 			
-                        /* Now send to team mates */
+                        /* 
+                            Now send to team mates 
+                            NO need to create the packet again as the activeGrp is not changing
+                        */
                         
                         /*
                             Get the iterator and check if the team mates are reached or not.
@@ -1234,6 +1276,7 @@ public class Quiz extends Thread
 		}
                 printGroups();
 		System.out.println("Sent all the packets !!. Hope the clients interface is changed!!");
+                return true;
 	}
 
         private String printGroups()
@@ -1270,6 +1313,7 @@ public class Quiz extends Thread
                 byte[] ser = Utilities.serialize(sgp);
                 
                 Packet p = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, ser);
+                
                 /*
                     Now send it to the leader
                 */
@@ -1282,10 +1326,22 @@ public class Quiz extends Thread
                     loopGrp.remove();
                     continue;
                 }
+                
+                /*
+                    Group may be updated, So form the packet again
+                */
+                
+                SelectedGroupPacket sgpUpdated = new SelectedGroupPacket(curGrp.groupName , curGrp.leaderRecord, curGrp.teamMembers);
+                
+                byte[] serUpdated = Utilities.serialize(sgp);
+                
+                Packet pUpdated = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, ser);
+                
                 /*
                     Now send it to the team member students
                 */
-                UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, curGrp, p);
+                
+                UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, curGrp, pUpdated);
                 
             }
         }
