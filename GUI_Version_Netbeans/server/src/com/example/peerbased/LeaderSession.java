@@ -14,6 +14,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -388,11 +389,21 @@ public class LeaderSession extends Thread{
 		/* 
 		 * This function broadcast's the leaders to the students ( who are not leaders ) and sends a groupname request to leaders
 		 */
-		
-		for( Leader l : leaderRequests)
+            
+                Iterator<Leader> leaderIter = leaderRequests.iterator();
+            
+		while( leaderIter.hasNext() )
 		{
-			for(Student s : studentsList)
+                        Iterator<Student> studIter = studentsList.iterator();
+			
+                        Leader l = leaderIter.next();
+                        
+                        boolean removeFlag = false;
+                        
+                        while( studIter.hasNext() )
 			{
+                                Student s = studIter.next();
+                                
 				if(s.uID.equals(l.id) ) 
 				{
 					// Add the leader name 
@@ -401,9 +412,23 @@ public class LeaderSession extends Thread{
 					groups.add(new Group("",s.name, s.uID, s));
 					System.out.println("Added a group!");
 
-					sendLeaderMessage(s.IP,s.name);
+					if( sendLeaderMessage(s.IP,s.name) == false )
+                                        {
+                                            /*
+                                                Leader can't be reached.
+                                                Remove his record in the leader list and also in the student list
+                                            */
+                                            studIter.remove();
+                                            continue;
+                                        }
+                                        
 					System.out.println("Sent leader group request to "+s.name+"!!!");
 				}
+                                
+                                /*
+                                    Remove from leader list
+                                */
+                                leaderIter.remove();
 			}
 		}
 		for(Student s: studentsList)
@@ -437,14 +462,14 @@ public class LeaderSession extends Thread{
 		
 		Packet sendPacky = new Packet(Utilities.seqNo,PacketTypes.LEADER_SCREEN_CHANGE,false ,Utilities.serialize(lp));
 		
-		UDPReliableHelperClass.sendToClientReliableWithGUI(sendSock, recvSock, IP, sendPacky, name);
+		if( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSock, recvSock, IP, sendPacky, name);
 	}
 	
 	
 	/*
 	 * Uses reliable UDP
 	 */
-	private void sendLeaderMessage(InetAddress IP,String name)
+	private boolean sendLeaderMessage(InetAddress IP,String name)
 	{
 		
 		// TODO can add strict check's at the client by sending the userName and ID. That will be validated at the client side
@@ -464,7 +489,7 @@ public class LeaderSession extends Thread{
 		/*
 		 * For receiving the packet
 		 */
-		UDPReliableHelperClass.sendToClientReliableWithGUI(sendSock, recvSock, IP, sendPacky, name);
+		return UDPReliableHelperClass.sendToClientReliableWithGUI(sendSock, recvSock, IP, sendPacky, name);
 	}
 	
 	

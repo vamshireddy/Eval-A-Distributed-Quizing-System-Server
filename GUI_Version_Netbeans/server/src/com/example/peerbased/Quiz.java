@@ -140,7 +140,7 @@ public class Quiz extends Thread
 		this.con = c;
 		this.teacherName = teacherName;
 		this.subject = subject;
-		this.studentsList = StudentListHandler.getList();
+		this.studentsList = null;    // Yet to be populated
 		this.questions = new ArrayList<>();
 		// Set the student list hadler so that all classes can access it!
 
@@ -182,13 +182,21 @@ public class Quiz extends Thread
                     Show the interface for teacher
                 */
                 waitPageGUI wp = null;
-                if( studentsList.size() < noOfStudents )
+                
+                /*
+                    Get the live Student's list which is populated by the login thread.
+                */
+                ArrayList<Student> list = StudentListHandler.getList();
+                
+                if( list.size() < noOfStudents )
                 {
                      wp = new waitPageGUI();
                      wp.setVisible(true);
                 }
-		while( studentsList.size() < noOfStudents )
+                
+		while( list.size() < noOfStudents )
 		{
+
 			System.out.println("Waiting for students to log in!");
 			try {
 				sleep(1000);
@@ -197,10 +205,22 @@ public class Quiz extends Thread
 				e.printStackTrace();
 			}
 		}
+                
+                /*
+                    Immediately clone this list to work on that for this quiz session
+                */
+                
+                studentsList = (ArrayList<Student>)list.clone();
+                        
+                /*
+                    Now work on this list
+                */
+                
                 if( wp != null )
                 { 
                     wp.setVisible(false);
                 }
+                
                 
 
                 QuizParametersGUI qp = new QuizParametersGUI();
@@ -226,7 +246,10 @@ public class Quiz extends Thread
                 
                 System.out.println("values are "+time_limit+" "+grp_sel_time);
                 
-                /* GUI PART */
+                /* 
+                    GUI PART
+                */
+                
                 if( wp == null )
                 {
                     wp = new waitPageGUI();
@@ -264,7 +287,6 @@ public class Quiz extends Thread
 			/*
 			 * For receiving the packet
 			 */
-                        
 			Student s = iterator.next();
                         
 			System.out.println("\nI am sending to "+s.name+"\n");
@@ -272,7 +294,7 @@ public class Quiz extends Thread
                         if( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket,  recvSocket, s.IP, packy, s.name) == false )
                         {
                             iterator.remove();                     
-                            System.out.println("Removed "+s.name);
+                            System.out.println("REMOVED "+s.name);
                         }
 		}
 		
@@ -343,7 +365,6 @@ public class Quiz extends Thread
                 AnswerTimeLimitInSeconds = qtsp.getAnsTime();
                 
 		startQuiz();
-		
 	}
         
         
@@ -1175,8 +1196,7 @@ public class Quiz extends Thread
 	{
 		/*
 		 * Make group 'activeGrp' as the active group and all others as passive 
-		 */
-		
+		 */	
 		QuizInterfacePacket qip = new QuizInterfacePacket(activeGrp.groupName, activeGrp.leaderID);
 		Packet pack = new Packet(Utilities.seqNo,PacketTypes.QUIZ_INTERFACE_START_PACKET, false, Utilities.serialize(qip));
 		
@@ -1195,41 +1215,13 @@ public class Quiz extends Thread
                         /* Send to leader */
                         pack.seq_no = Utilities.seqNo;
                         
-                        while( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, loopGrp.leaderRecord.IP , pack, loopGrp.leaderRecord.name) == false )
+                        if( UDPReliableHelperClass.sendToLeader_UDP_Reliable(sendSocket, recvSocket, loopGrp, pack) == false )
                         {
                             /*
-                                If the leader is not reachable, then make next one as leader
+                                Group is removed due to insufficient students
                             */
-                            System.out.println("Leader "+loopGrp.leaderName+" is removed");
-                            loopGrp.leaderRecord = null;
-                            loopGrp.leaderID = null;
-                            loopGrp.leaderName = null;
-                            
-                            /*
-                                Get a new team mate and make him a leader
-                            */
-                           
-                            Student newLeader = loopGrp.teamMembers.remove(0);
-                            
-                            
-                            if( newLeader == null )
-                            {
-                                /*
-                                    Leader is gone and there are no team mates
-                                    Delete the group
-                                */
-                                System.out.println("there is no one in this grp. Group is deleted");
-                                iter.remove();
-                                continue;
-                            }
-                            
-                            System.out.println("Student "+newLeader.name+" is made as a new leader");
-                            
-                            
-                            loopGrp.leaderRecord = newLeader;
-                            loopGrp.leaderID = newLeader.uID;
-                            loopGrp.leaderName = newLeader.name;
-                            
+                            iter.remove();
+                            continue;
                         }
                         
 			
@@ -1238,22 +1230,7 @@ public class Quiz extends Thread
                         /*
                             Get the iterator and check if the team mates are reached or not.
                         */
-                        Iterator<Student> innerIter = loopGrp.teamMembers.iterator();
-                        while( innerIter.hasNext() )
-                        {
-                            Student s = innerIter.next();
-                            pack.seq_no = Utilities.seqNo;
-                            
-                            /*
-                                Now perform checking of availabilty
-                            */
-                            
-                            while( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, s.IP , pack, s.name) == false )
-                            {
-                                System.out.println("CLient "+s.name+" is removed");
-                                innerIter.remove();
-                            }
-                        }
+                        UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, loopGrp, pack);
 		}
                 printGroups();
 		System.out.println("Sent all the packets !!. Hope the clients interface is changed!!");
@@ -1278,44 +1255,139 @@ public class Quiz extends Thread
                 return grpString;
 	}
         
-	private void sendGroupsToStudents(ArrayList<Group> grp)
+	private void sendGroupsToStudents(ArrayList<Group> grpy)
 	{
-		for(int i=0;i<grp.size();i++)
-		{
-			Group g = grp.get(i);
-			System.out.println("\n\nGroup "+g.groupName);
-			ArrayList<Student> teammembers = g.teamMembers;
-			Student leader = g.leaderRecord;
-			sendToLeader(g.groupName, leader , teammembers);
-			sendToTeamMem(g.groupName, leader, teammembers);
-		}
-	}
-	
-	private void sendToLeader(String gname, Student leader, ArrayList<Student> team )
-	{
-		
-		System.out.println("Sending to "+leader.name);
+                
+            Iterator<Group> loopGrp = grpy.iterator();
+            
+            while( loopGrp.hasNext() )
+            {   
+                
+                Group curGrp = loopGrp.next();
+                
+                SelectedGroupPacket sgp = new SelectedGroupPacket(curGrp.groupName , curGrp.leaderRecord, curGrp.teamMembers);
+                
+                byte[] ser = Utilities.serialize(sgp);
+                
+                Packet p = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, ser);
+                
+                
+                /*
+                    Now send it to the leader
+                */
+                
+                if( UDPReliableHelperClass.sendToLeader_UDP_Reliable(sendSocket, recvSocket, curGrp, p) == false )
+                {
+                    /*
+                        Group is removed
+                    */
+                    loopGrp.remove();
+                    continue;
+                }
+                
+                /*
+                    Now send it to the team member students
+                */
+                
+                UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, curGrp, p);
+                
+            }
+        }
+//		while( iter.hasNext() )
+//                {
+//                        Group g = iter.nex            
+//                Iterator<Group> iter = grp.iterator();t();
+//                        
+//			System.out.println("\n\nGroup "+g.groupName);
+//			//ArrayList<Student> teammembers = g.teamMembers;
+//                        /*
+//                            Send to leader
+//                        */
+//			while( sendToLeader(g.groupName, g.leaderRecord , g.teamMembers) == false )
+//                        {
+//                            /*
+//                                leader can't be reached, So make a new teammember as a leader
+//                            */
+//                            System.out.println("Leader cant be reached"+g.leaderName);
+//                            g.leaderRecord = null;
+//                            g.leaderID = null;
+//                            g.leaderName = null;
+//                            
+//                            Student newLeader = null;
+//                            try
+//                            {
+//                                 newLeader = g.teamMembers.remove(0);
+//                            }
+//                            catch( ArrayIndexOutOfBoundsException ai )
+//                            {
+//                                System.out.println("The group is removed "+g.groupName);
+//                                iter.remove();
+//                                continue;
+//                            }
+//                            
+//                            System.out.println("The new leader is "+newLeader.name);
+//                            
+//                            g.leaderID = newLeader.uID;
+//                            g.leaderName = newLeader.name;
+//                            g.leaderRecord = newLeader;
+//                            
+//                        }
+//                        /*
+//                            Send to the team mates
+//                        */
+//			sendToTeamMem(g.groupName, g.leaderRecord, g.teamMembers);
+//                        System.out.println("\n\nGROUP DETAILS\n\n");
+//                        printGroups();
+//		}
 
-		SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
-		System.out.println("inside packet size is : "+Utilities.serialize(sgp).length);
-		
-		Packet sendPacky = new Packet(Utilities.seqNo,PacketTypes.GROUP_DETAILS_MESSAGE, false, Utilities.serialize(sgp));
-		
-		UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, leader.IP, sendPacky,leader.name);
-		
-	}
-	
-	private void sendToTeamMem(String gname , Student leader, ArrayList<Student> team)
-	{
-		for(Student stud : team)
-		{
-			SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
-			System.out.println("inside packet size is : "+Utilities.serialize(sgp).length);
-			Packet p = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, Utilities.serialize(sgp));
-			
-                        System.out.println("SENDING TO TEAM MEMBER :"+stud.name);
-                        
-			UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, stud.IP, p,stud.name);
-		}
-	}
+//	private boolean sendToLeader(String gname, Student leader, ArrayList<Student> team )
+//	{
+//		
+//		System.out.println("Sending to "+leader.name);
+//
+//		SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
+//		System.out.println("inside packet size is : "+Utilities.serialize(sgp).length);
+//		
+//		Packet sendPacky = new Packet(Utilities.seqNo,PacketTypes.GROUP_DETAILS_MESSAGE, false, Utilities.serialize(sgp));
+//		
+//		if( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, leader.IP, sendPacky,leader.name)  == false )
+//                {
+//                    /*
+//                        Leader cant be reached
+//                    */
+//                    return false;
+//                }
+//		return true;
+//	}
+//	
+//	private void sendToTeamMem(String gname , Student leader, ArrayList<Student> team)
+//	{
+//                if( team.isEmpty() )
+//                {
+//                    System.out.println("Team "+gname+" is empty");
+//                    return;
+//                }
+//            
+//                Iterator<Student> iter = team.iterator();
+//                
+//                SelectedGroupPacket sgp = new SelectedGroupPacket(gname , leader, team);
+//                
+//                byte[] ser = Utilities.serialize(sgp);
+//                
+//                Packet p = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, ser);
+//                
+//                while(iter.hasNext())
+//		{
+//                        Student stud = iter.next();
+//                        
+//			p.seq_no = Utilities.seqNo;
+//			
+//                        System.out.println("SENDING TO TEAM MEMBER :"+stud.name);
+//                        
+//			if( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, stud.IP, p,stud.name) == false )
+//                        {
+//                            iter.remove();
+//                        }
+//		}
+//	}
 }

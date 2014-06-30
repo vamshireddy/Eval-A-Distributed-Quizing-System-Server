@@ -12,6 +12,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
+import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -21,6 +22,66 @@ import java.util.logging.Logger;
  */
 public class UDPReliableHelperClass {
     
+    
+        public static void sendToTeamMate_UDP_Reliable(DatagramSocket sendSocket, DatagramSocket recvSocket, Group loopGrp, Packet pack)
+        {
+                
+                Iterator<Student> innerIter = loopGrp.teamMembers.iterator();
+                
+                while( innerIter.hasNext() )
+                {
+                    Student s = innerIter.next();
+                    pack.seq_no = Utilities.seqNo;
+
+                    /*
+                        Now perform checking of availabilty
+                    */
+
+                    if( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, s.IP , pack, s.name) == false )
+                    {
+                        System.out.println("CLient "+s.name+" is removed");
+                        innerIter.remove();
+                    }
+                }
+        }
+    
+        public static boolean sendToLeader_UDP_Reliable(DatagramSocket sendSocket,DatagramSocket recvSocket, Group loopGrp,Packet pack)
+        {
+                
+                while( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, loopGrp.leaderRecord.IP , pack, loopGrp.leaderRecord.name) == false )
+                {
+                    /*
+                        If the leader is not reachable, then make next one as leader
+                    */
+                    System.out.println("Leader "+loopGrp.leaderName+" is removed");
+                    loopGrp.leaderRecord = null;
+                    loopGrp.leaderID = null;
+                    loopGrp.leaderName = null;
+
+                    /*
+                        Get a new team mate and make him a leader
+                    */
+                    Student newLeader = null;
+                    try
+                    {
+                         newLeader = loopGrp.teamMembers.remove(0);
+                    }
+                    catch( ArrayIndexOutOfBoundsException ai )
+                    {
+                        System.out.println("The group is removed "+loopGrp.groupName);
+                        return false;
+                    }
+
+                    System.out.println("Student "+newLeader.name+" is made as a new leader");
+
+
+                    loopGrp.leaderRecord = newLeader;
+                    loopGrp.leaderID = newLeader.uID;
+                    loopGrp.leaderName = newLeader.name;
+
+                }
+                return true;
+        }
     
     	public static void sendDatagramPacket(DatagramSocket sock,InetAddress ip, int port, Packet p)
 	{
