@@ -119,8 +119,7 @@ public class UDPReliableHelperClass {
 			}
 		}
 	}
-        
-        
+
 	public static int sendToClient_Reliable(DatagramSocket sendSock, DatagramSocket recvSock, InetAddress IP, Packet packy)
 	{
 		boolean ackFlag = false;

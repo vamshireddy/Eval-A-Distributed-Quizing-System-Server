@@ -1270,8 +1270,6 @@ public class Quiz extends Thread
                 byte[] ser = Utilities.serialize(sgp);
                 
                 Packet p = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, ser);
-                
-                
                 /*
                     Now send it to the leader
                 */
@@ -1284,11 +1282,9 @@ public class Quiz extends Thread
                     loopGrp.remove();
                     continue;
                 }
-                
                 /*
                     Now send it to the team member students
                 */
-                
                 UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, curGrp, p);
                 
             }

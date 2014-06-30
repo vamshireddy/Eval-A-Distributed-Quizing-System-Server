@@ -390,14 +390,31 @@ public class LeaderSession extends Thread{
 		 * This function broadcast's the leaders to the students ( who are not leaders ) and sends a groupname request to leaders
 		 */
             
+                LeaderPacket lp = new LeaderPacket();
+		/*
+		 * Switch on the groupName request flag
+		 */
+		lp.grpNameRequest = true;
+		Packet sendPacky = new Packet(Utilities.seqNo, PacketTypes.LEADER_SCREEN_CHANGE, false, Utilities.serialize(lp));
+                /*
+                    Send it to the leaders
+                */
+            
                 Iterator<Leader> leaderIter = leaderRequests.iterator();
             
 		while( leaderIter.hasNext() )
 		{
-                        Iterator<Student> studIter = studentsList.iterator();
 			
                         Leader l = leaderIter.next();
                         
+                        /*
+                            Iterate in students list to find the record (IP)
+                        */
+                        Iterator<Student> studIter = studentsList.iterator();
+                        
+                        /*
+                            Remove flag is set when the leader is not reachable
+                        */
                         boolean removeFlag = false;
                         
                         while( studIter.hasNext() )
@@ -409,30 +426,55 @@ public class LeaderSession extends Thread{
 					// Add the leader name 
 					l.name = s.name;
 					// Make a new group entry
-					groups.add(new Group("",s.name, s.uID, s));
-					System.out.println("Added a group!");
 
-					if( sendLeaderMessage(s.IP,s.name) == false )
+					if( sendLeaderMessage(s.IP,s.name,sendPacky) == false )
                                         {
                                             /*
                                                 Leader can't be reached.
                                                 Remove his record in the leader list and also in the student list
                                             */
+                                            System.out.println("Leader is removed and no groups are formed right now");
+                                            removeFlag = true;
                                             studIter.remove();
-                                            continue;
                                         }
-                                        
-					System.out.println("Sent leader group request to "+s.name+"!!!");
+                                        else
+                                        {
+                                            /*
+                                                Leader can be reached, so create a group
+                                            */
+                                            groups.add(new Group("",s.name, s.uID, s));
+                                            System.out.println("Added a group!");
+                                            System.out.println("Sent leader group request to "+s.name+"!!!");
+                                        }
+                                        /*
+                                            Done with searching for the leader in the student list
+                                        */
+                                        break;
 				}
-                                
-                                /*
-                                    Remove from leader list
-                                */
-                                leaderIter.remove();
 			}
+                        /*
+                            Remove from leader list
+                        */
+                        if( removeFlag == true )
+                        {
+                            leaderIter.remove();
+                        }
+                        
 		}
-		for(Student s: studentsList)
+                
+                
+                LeaderPacket lpTeam = new LeaderPacket();
+		lpTeam.LeadersListBroadcast = true; // This is flag to differentiate the list packet for non-leaders and group name selection packet for leaders
+		lpTeam.leaders = leaderRequests;			// Add the leaders
+                Packet sendPackyTeam = new Packet(Utilities.seqNo,PacketTypes.LEADER_SCREEN_CHANGE,false,Utilities.serialize(lpTeam));
+		
+                
+                Iterator<Student> stuIter = studentsList.iterator();
+                
+		while( stuIter.hasNext() )
                 {
+                        Student s  = stuIter.next();
+                        
 			boolean flag = true;
 			for(Leader l : leaderRequests)
                         {
@@ -444,32 +486,35 @@ public class LeaderSession extends Thread{
 			} 
 			if( flag == true )
 			{
-				sendElectedLeaders(leaderRequests, s.IP,s.name);
-				System.out.println("Sent online Leaders to "+s.uID+"!!!");
+				if( sendElectedLeaders(s.IP,s.name,sendPackyTeam) == false )
+                                {
+                                    System.out.println("Removing the record of "+s.name);
+                                    stuIter.remove();
+                                }
+                                else
+                                {
+                                    System.out.println("Sent online Leaders to "+s.uID+"!!!");
+                                }
 			}
 		}
 	}
 	
 
-	private void sendElectedLeaders(ArrayList<Leader> leaders, InetAddress IP, String name) {
+	private boolean sendElectedLeaders(InetAddress IP, String name, Packet sendPacky)
+        {
 		/*
 		 * Send the leaders to everyone except the leader students
 		 */  
 		// TODO can add strict check's at the client by sending the userName and ID. That will be validated at the client side
-		LeaderPacket lp = new LeaderPacket();
-		lp.LeadersListBroadcast = true; // This is flag to differentiate the list packet for non-leaders and group name selection packet for leaders
-		lp.leaders = leaders;			// Add the leaders
 		
-		Packet sendPacky = new Packet(Utilities.seqNo,PacketTypes.LEADER_SCREEN_CHANGE,false ,Utilities.serialize(lp));
-		
-		if( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSock, recvSock, IP, sendPacky, name);
+		return UDPReliableHelperClass.sendToClientReliableWithGUI(sendSock, recvSock, IP, sendPacky, name);
 	}
 	
 	
 	/*
 	 * Uses reliable UDP
 	 */
-	private boolean sendLeaderMessage(InetAddress IP,String name)
+	private boolean sendLeaderMessage(InetAddress IP,String name, Packet sendPacky)
 	{
 		
 		// TODO can add strict check's at the client by sending the userName and ID. That will be validated at the client side
@@ -478,14 +523,7 @@ public class LeaderSession extends Thread{
 		 * Sequence number is used to track the same packets and reply from the client to the resp packet which is sent by the server
 		 * Sequence number is global and incremented for every client
 		 */
-		LeaderPacket lp = new LeaderPacket();
-		/*
-		 * Switch on the groupName request flag
-		 */
-		lp.grpNameRequest = true;
-		
-		
-		Packet sendPacky = new Packet(Utilities.seqNo, PacketTypes.LEADER_SCREEN_CHANGE, false, Utilities.serialize(lp));
+
 		/*
 		 * For receiving the packet
 		 */
