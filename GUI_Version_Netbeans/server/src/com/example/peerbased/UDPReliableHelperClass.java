@@ -101,7 +101,7 @@ public class UDPReliableHelperClass {
                             For displaying the group. In this case if the leader is not reached, then group details get changed
                         */
                         
-                        System.out.println("FOrming a new packet");
+                        System.out.println("Forming a new packet");
                         
                         SelectedGroupPacket sgp = new SelectedGroupPacket(loopGrp.groupName , loopGrp.leaderRecord, loopGrp.teamMembers);
                         
@@ -121,7 +121,7 @@ public class UDPReliableHelperClass {
                         */
                         if( qipRcvd.activeGroupName.equals(loopGrp.groupName))
                         {
-                                                            
+                                               
                             QuizInterfacePacket qip = new QuizInterfacePacket(loopGrp.groupName, loopGrp.leaderID);                        
                             pack = new Packet(Utilities.seqNo, pack.type , false, Utilities.serialize(qip));
                         }

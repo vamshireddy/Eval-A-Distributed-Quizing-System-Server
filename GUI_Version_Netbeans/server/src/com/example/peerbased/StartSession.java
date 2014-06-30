@@ -1,4 +1,6 @@
 package com.example.peerbased;
+import DatabaseGUI.Essentials;
+import DatabaseGUI.HomePage;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -142,6 +144,9 @@ class StartSession {
 		switch(choice)
 		{
 			case 1: // This case needs to access student database
+                                        
+                                        Essentials.objHomePage = new HomePage();
+                                        Essentials.objHomePage.setVisible(true);
 					break;
 			case 2:	// Initiates the Quiz
 					quiz = new Quiz( subject,teacherName,databaseConnection);
@@ -155,16 +160,16 @@ class StartSession {
                                             e.printStackTrace();
                                         }
 					break;
-			case 3:	
-					break;
-			case 4: // This case needs to access student database ( Questions in database )
-					break;
-			case 5: // Upload Documents 
-					break;
-			case 6: // Exit
-					displayStudents();
-					break;
-			case 7: return -1;
+//			case 3:	
+//					break;
+//			case 4: // This case needs to access student database ( Questions in database )
+//					break;
+//			case 5: // Upload Documents 
+//					break;
+//			case 6: // Exit
+//					displayStudents();
+//					break;
+//			case 7: return -1;
 			
 		    default: return -1;
 		}

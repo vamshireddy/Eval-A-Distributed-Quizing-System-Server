@@ -105,10 +105,7 @@ public class Quiz extends Thread
                 /*
                     GUI FRAME INITIALIZATION
                 */
-                
-                /*
-                Create a GUI thread
-                */
+
                 System.out.println("waiting for parameters");
                 
                 QuizStartPage qsp = new QuizStartPage(this);
@@ -403,7 +400,6 @@ public class Quiz extends Thread
 				 * 
 				 * Now receive the questions from active group
 				 */
-				// Start the timer for question session
                                 qwp.setVisible(true);
                                 
 				HashMap<String,String> questionFormed = receiveAndSendQuestions(questionSeqNo,g);
@@ -1194,19 +1190,27 @@ public class Quiz extends Thread
 	
 	private boolean sendInterfacePacketBCast(Group activeGrp)
 	{
-                boolean activeRemoveFlag = false;
+            
+                /*
+                        THINGS TO DO 
+                        1) Send to the active Group Leader reliably
+                        2) Send to the team mates of active group leader relaibly
+                        3) Send to all other groups in a loop including leader and team mates
+                */
                 
 		/*
-		 * Make group 'activeGrp' as the active group and all others as passive 
+		 * Form a packet with 'activeGrp' as the active group
 		 */	
 		QuizInterfacePacket qip = new QuizInterfacePacket(activeGrp.groupName, activeGrp.leaderID);
 		Packet pack = new Packet(Utilities.seqNo,PacketTypes.QUIZ_INTERFACE_START_PACKET, false, Utilities.serialize(qip));
 		
 		/*
 		 *  Send the packet to active grp first. If it receives the packet, then continue. If none of the active grp members are available, then delete the group
-                    and 
 		 */
                 
+                /*
+                    1) Handle active group Leader first
+                */
                 if( UDPReliableHelperClass.sendToLeader_UDP_Reliable(sendSocket, recvSocket, activeGrp, pack) == false )
                 {
                     /*
@@ -1224,16 +1228,35 @@ public class Quiz extends Thread
                                 Found the grp, Now Deleting the group
                             */
                             itDelete.remove();
+                            /*
+                                Return false so that the next group will be assigned the turn
+                            */
                             return false;
                         }
                     }
                     
                     /*
-                        Return False, so that the next group is given turn
+                        It should never come here
                     */
                     System.out.println("Error !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                     return false;
                 }
+                /*
+                    2) Handle active group team Mates
+                */
+                UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, activeGrp, pack);
+                
+                
+                /*
+                    3) Now active group is Done... Send for the passive groups
+                */
+                
+                
+                /*
+                    Form the packet again because the active group leader may be changed.
+                */
+                qip = new QuizInterfacePacket(activeGrp.groupName, activeGrp.leaderID);
+		pack = new Packet(Utilities.seqNo,PacketTypes.QUIZ_INTERFACE_START_PACKET, false, Utilities.serialize(qip));
                 
                 /*
                     Loop through the list for all the groups
@@ -1249,6 +1272,9 @@ public class Quiz extends Thread
                         */
                         if( loopGrp.equals(activeGrp) )
                         {
+                            /*
+                                Already handled
+                            */
                             continue;
                         }
                         
@@ -1260,6 +1286,7 @@ public class Quiz extends Thread
                             /*
                                 Group is removed due to insufficient students
                             */
+                            System.out.println("Group is removed");
                             iter.remove();
                             continue;
                         }
@@ -1272,6 +1299,7 @@ public class Quiz extends Thread
                         /*
                             Get the iterator and check if the team mates are reached or not.
                         */
+                        System.out.println("\n\n\n\nThe loop grp ka size is (before) for GROUP (+"+loopGrp.groupName+") : "+loopGrp.teamMembers.size()+"\n\n\n\n");
                         UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, loopGrp, pack);
 		}
                 printGroups();
@@ -1282,7 +1310,7 @@ public class Quiz extends Thread
         private String printGroups()
 	{
                 String grpString = "";
-		System.out.println("The groups are : ");
+		System.out.println("The GROUPS are : \n\n");
 		
                 for( Group g : groups)
                 {
@@ -1291,7 +1319,7 @@ public class Quiz extends Thread
 			for(int j=0;j<g.teamMembers.size();j++)
 			{
                                 grpString = grpString + "Student : "+g.teamMembers.get(j).name+"\n";
-				System.out.println("Student : "+g.teamMembers.get(j).name);
+				System.out.println("Student : "+(j+1)+g.teamMembers.get(j).name);
 			}
                         grpString = grpString + "\n";
 		}
