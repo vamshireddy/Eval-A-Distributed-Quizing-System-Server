@@ -50,6 +50,37 @@ public class UDPReliableHelperClass {
                     }
                 }
         }
+        
+        public static void sendToTeamMate_UDP_Reliable_and_IncreaseQuestionsAttempted(DatagramSocket sendSocket, DatagramSocket recvSocket, Group loopGrp, Packet pack)
+        {
+                if( loopGrp.teamMembers.isEmpty() )
+                {
+                    System.out.println("Group Empty\n");
+                    return;
+                }
+                
+                Iterator<Student> innerIter = loopGrp.teamMembers.iterator();
+                
+                while( innerIter.hasNext() )
+                {
+                    Student s = innerIter.next();
+                    pack.seq_no = Utilities.seqNo;
+
+                    /*
+                        Now perform checking of availabilty
+                    */
+
+                    if( UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, s.IP , pack, s.name) == false )
+                    {
+                        System.out.println("CLient "+s.name+" is removed");
+                        innerIter.remove();
+                    }
+                    else
+                    {
+                        s.noOfQuestions++;
+                    }
+                }
+        }
     
         public static boolean sendToLeader_UDP_Reliable(DatagramSocket sendSocket,DatagramSocket recvSocket, Group loopGrp,Packet pack)
         {

@@ -29,43 +29,7 @@ public class Essentials
     
     
     // Object for Home Page
-    public static  HomePage objHomePage;
-//    
-//    // Object for Teacher Registration
-//    public static TeacherRegistration objTeacherRegistration;
-//    
-//    // Object for Teacher Details
-//    public static TeacherDetails objTeacherDetails;
-//    
-//    // Object for Teacher Login
-//    public static TeacherLogin objTeacherLogin;
-//    
-//    
-//    // Object for Teacher Options
-//    public static TeacherOptions objTeacherOption;
-//    
-//    // Object for Configuring student details
-//    public static  ConfigureStudents objConfigureStudent;
-//    
-//    
-//    // Object for Viewing Performance of students
-//    public static  ViewPerformance objViewPerformance;
-//    
-//    
-//    // Object for Viewing Questions 
-//    public static  ViewQuestions objViewQuestions;
-//    
-//    
-//    // Object for Adding a new student
-//    public static AddStudent objAddStudent;
-//    
-//    // Objectt for taking the new password and modifying the student record
-//    public static ModifyStudent objModifyStudent;
-//    
-//    
-//    // Object for viewing student details
-//    public static ViewStudentDetails objViewStudentDetails;
-//            
+    public static  HomePageDB objHomePage;
     
     static
     {

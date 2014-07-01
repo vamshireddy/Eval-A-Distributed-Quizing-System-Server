@@ -15,14 +15,16 @@ import javax.swing.JOptionPane;
  *
  * @author sukalyan14
  */
-public class HomePage extends javax.swing.JFrame {
+public class HomePageDB extends javax.swing.JFrame {
     //private Connection databaseConnection;
     // Essentials e;
     
+    private boolean exitStatus;
     
-    public HomePage()
+    public HomePageDB()
     {
         initComponents();
+        exitStatus = false;
 //        
 //        heading.setFont(new java.awt.Font(Essentials.fontURL,1,24)); // NOI18N
 //        heading.setText(Essentials.messages.getString("homePageOptions"));
@@ -79,7 +81,7 @@ public class HomePage extends javax.swing.JFrame {
         jPanel1Layout.setHorizontalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                .addContainerGap(282, Short.MAX_VALUE)
+                .addContainerGap(272, Short.MAX_VALUE)
                 .addComponent(heading)
                 .addGap(260, 260, 260))
         );
@@ -154,7 +156,7 @@ public class HomePage extends javax.swing.JFrame {
                 .addComponent(teacherDetailsOption)
                 .addGap(36, 36, 36)
                 .addComponent(teacherLoginOption)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 116, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 86, Short.MAX_VALUE)
                 .addComponent(exitButton)
                 .addGap(102, 102, 102))
         );
@@ -188,9 +190,19 @@ public class HomePage extends javax.swing.JFrame {
 
     private void exitButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_exitButtonActionPerformed
             // TODO add your handling code here:
-        System.exit(0);
+        exitStatus = true;
     }//GEN-LAST:event_exitButtonActionPerformed
 
+    public boolean getExitStatus()
+    {
+        return exitStatus;
+    }
+    
+    public void reset()
+    {
+        exitStatus = false;
+    }
+    
     private void teacherLoginOptionActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_teacherLoginOptionActionPerformed
 //        // TODO add your handling code here:
 //        

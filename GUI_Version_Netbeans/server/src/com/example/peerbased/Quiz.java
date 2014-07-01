@@ -400,10 +400,10 @@ public class Quiz extends Thread
                                     /*
                                         The active group has been deleted, So make another one active
                                     */
+                                    System.out.println("Active group CRASHED!!!, Rotating the turn to next one");
                                     continue;
                                 }
 				/*
-				 * 
 				 * Now receive the questions from active group
 				 */
                                 qwp.setVisible(true);
@@ -431,7 +431,6 @@ public class Quiz extends Thread
 				 * Calculate the marks according to the level
 				 */
 				calculateMarks(answeredStuds,g);
-                                
                                 /*
                                     Print stats to teacher
                                 */
@@ -445,45 +444,74 @@ public class Quiz extends Thread
                 
                 QuizStats qstat = new QuizStats();
                 qstat.setVisible(true);
+                
                 /*
                     Quiz is completed. Send results
                 */
-                Packet packy = new Packet(Utilities.seqNo, false, true, false,null, true);
-                packy.type = PacketTypes.QUIZ_END_PACKET;
-                packy.ack = false;
                 
-                for(Student s: studentsList)
+                Packet packy = new Packet(Utilities.seqNo, PacketTypes.QUIZ_END_PACKET, false, null );
+                QuizResultPacket qrp = new QuizResultPacket(-1,-1,-1);
+                
+                for(Group loopGrp : groups)
 		{
+                        /*
+                            Iterate through the groups and send marks to the students
+                        */
+                    
 			/*
-			 * For sending the packet
-			 */
-                        QuizResultPacket qrp = new QuizResultPacket(s.noOfQuestions, s.noOfAnswers, s.marks);
+                            Send to leader of this group
+                        */
+                        
+                        Student l = loopGrp.leaderRecord;
+                        
+                        /*
+                            Set the student's marks
+                        */
+                        qrp.marks = l.marks;
+                        qrp.noOfQuesAttempted = l.noOfQuestions;
+                        qrp.noOfQuesCorrect = l.noOfAnswers;
+                        
 			packy.seq_no = Utilities.seqNo;
                         packy.data = Utilities.serialize(qrp);
-			/*
-			 * For receiving the packet
-			 */
-			System.out.println("\nI am sending to "+s.name+"\n");
-			if( UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy) == -1 )
-			{
-				System.out.println("Client couldn't connect");
-				System.exit(0);
-			}
+                        
+                        UDPReliableHelperClass.sendToClientReliableWithGUI(sendSocket, recvSocket, l.IP , packy, l.name);
+                        
+                        
                         /*
                             Update the record
                         */
-                        try
+                        
+                        AddRecordToDatabase(l);
+                        
+			/*
+			 * Now send it to the team mates
+			 */
+                        
+                        for( Student s : loopGrp.teamMembers )
                         {
-                            String query = "insert into student_performance values ( '"+s.uID+"','"+s.name+"','"+subject+"','"+standard+"',"
-                                    +"CURDATE()"+",'"+s.noOfQuestions+"','"+s.noOfAnswers+"','"+s.marks+"')";
-                            System.out.println("Query is "+query);
-                            PreparedStatement ps  = (PreparedStatement)con.prepareStatement(query);
-                            ps.executeUpdate();  
-                            System.out.println("Student "+s.name+" record stored succesfully");
-                        } catch (SQLException ex) {
-                            Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
-                            System.out.println("Error in storing the questions");
+                            
+                            qrp.marks = s.marks;
+                            qrp.noOfQuesAttempted = s.noOfQuestions;
+                            qrp.noOfQuesCorrect = s.noOfAnswers;
+                            
+                            packy.seq_no = Utilities.seqNo;
+                            packy.data = Utilities.serialize(qrp);
+                            
+                            System.out.println("\nI am sending to "+s.name+"\n");
+                            
+                            if( UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket, s.IP, packy) == Utilities.FAIL )
+                            {
+                                    System.out.println("Client couldn't connect");
+                                    continue;
+                            }
+                            
+                            /*
+                                Update the record
+                            */
+                            
+                            AddRecordToDatabase(s);
                         }
+                        
                 }
                 /*
                     Show bar chart about groups.
@@ -493,6 +521,22 @@ public class Quiz extends Thread
                     Show the Home Page GUI
                 */
 	}
+        
+        private void AddRecordToDatabase(Student s)
+        {
+            try
+            {
+                String query = "insert into student_performance values ( '"+s.uID+"','"+s.name+"','"+subject+"','"+standard+"',"
+                        +"CURDATE()"+",'"+s.noOfQuestions+"','"+s.noOfAnswers+"','"+s.marks+"')";
+                System.out.println("Query is "+query);
+                PreparedStatement ps  = (PreparedStatement)con.prepareStatement(query);
+                ps.executeUpdate();  
+                System.out.println("Student "+s.name+" record stored succesfully");
+            } catch (SQLException ex) {
+                Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                System.out.println("Error in storing the questions");
+            }
+        }
         
         private void showQuestionStats(HashMap<String,String> questionFormed, HashMap<String,Double> stats)
         {
@@ -524,22 +568,43 @@ public class Quiz extends Thread
 		/*
                     Allot marks to the people who answered the question
                 */
-		for(int i=0;i<studentsList.size();i++)
-		{
-			Student s = studentsList.get(i);
-			for(int j=0;j<studs.size();j++)
-			{
-				if( s.uID.equals(studs.get(j)) )
-				{
-					s.noOfAnswers++;
-                                        // +2 for those who answered
-					s.marks = s.marks + 2;
-					break;
-				}
-			}
-		}
+		
+                for( String stud : studs )
+                {
+                    for( Group loopGrp : groups )
+                    {
+                        if( loopGrp.equals(g) )
+                        {
+                            continue;
+                        }
+                        
+                        /*
+                            Allot marks to leader
+                        */
+                        Student leader = loopGrp.leaderRecord;
+                        
+                        if( leader.uID.equals(stud) )
+                        {
+                            leader.marks += 2;
+                        }
+                        
+                        /*
+                            Allot marks to non leaders
+                        */
+                        
+                        for( Student s : loopGrp.teamMembers )
+                        {
+                            if( s.uID.equals(stud) )
+                            {
+                                s.marks += 2;
+                            }
+                        }
+                        
+                    }
+                }
+ 
                 /*
-                    Allot marks to the group who asked the question
+                    Allot marks to the group members who asked the question
                 */
                 
                 g.leaderRecord.marks = g.leaderRecord.marks + questionLevel;
@@ -548,15 +613,6 @@ public class Quiz extends Thread
                 {
                     s.marks = s.marks + questionLevel;
                 }
-                /*
-                    Print
-                */
-                
-		for(int i=0;i<studentsList.size();i++)
-		{
-			Student s = studentsList.get(i);
-			System.out.println("Student name : "+s.name+"  Marks : "+s.marks+" Attempted : "+s.noOfQuestions+" Answered correct :"+s.noOfAnswers);
-		}
 	}
 	
 	private HashMap<String,Double> getResponses(int qseq_no, HashMap<String,String> questionFormed)
@@ -564,7 +620,6 @@ public class Quiz extends Thread
                 /*
                     Start the GUI for the reponse listening
                 */
-                
                 HashMap<String,Double> stats = new HashMap<>();
                 
                 String answer = questionFormed.get("answer");
@@ -662,7 +717,9 @@ public class Quiz extends Thread
 			
 			System.out.println("Pack : "+packy.seq_no+" qp : "+packy.quizPacket);
 			
-			if( packy.seq_no == PacketSequenceNos.QUIZ_RESPONSE_CLIENT_SEND && packy.quizPacket == true)
+                        int rcvdSeqNo = packy.seq_no;
+                        
+			if( packy.type == PacketTypes.QUESTION_RESPONSE && packy.ack ==  false )
 			{
 				System.out.println("packet seqno correct and its a quiz packet!!!");
 				ResponsePacket rp = (ResponsePacket)Utilities.deserialize(packy.data);
@@ -675,7 +732,7 @@ public class Quiz extends Thread
 						/*
 						 * Its a wrong answer which is sent by the student
 						 */
-						sendResponseAck( false , clientIP, rp );
+						sendResponseAck( false , clientIP, rp ,rcvdSeqNo);
 						continue;
 					}
                                         
@@ -733,11 +790,11 @@ public class Quiz extends Thread
 						/* 	answeredStudIDs.add(rp.uID);
 						 * Send ack to the response
 						 */
-						sendResponseAck( true, clientIP, rp );
+						sendResponseAck( true, clientIP, rp ,rcvdSeqNo);
 					}
 					else
 					{
-						sendResponseAck( false , clientIP, rp );
+						sendResponseAck( false , clientIP, rp ,rcvdSeqNo);
 					}
 				}
 				else
@@ -755,21 +812,21 @@ public class Quiz extends Thread
                 {
                     case 1 :   for(int i=0;i<4;i++)
                                {
-                                   double a = ((float)responseCount[i]/studentsList.size())*100;
+                                   double a = ((float)responseCount[i]/getStudentCount())*100;
                                    stats.put(responseOptions[i],a);
                                }
                                break;
                         
                     case 2  :  for(int i=0;i<2;i++)
                                {
-                                   double a = ((float)responseCount[i]/studentsList.size())*100;
+                                   double a = ((float)responseCount[i]/getStudentCount())*100;
                                    stats.put(responseOptions[i],a);
                                }
                                break;
                         
                     case 3  :  for(int i=0;i<2;i++)
                                {
-                                   double a = ((float)responseCount[i]/studentsList.size())*100;
+                                   double a = ((float)responseCount[i]/getStudentCount())*100;
                                    stats.put(responseOptions[i],a);
                                }
                                break;
@@ -783,14 +840,26 @@ public class Quiz extends Thread
                 rw.setVisible(false);
 		return stats;
 	}
+        
+        private int getStudentCount()
+        {
+            int count = 0;
+            for( Group g : groups )
+            {
+                count++;
+                count += g.teamMembers.size();
+            }
+            return count;
+        }
 	
-	private void sendResponseAck(boolean res, InetAddress ip, ResponsePacket rp)
+	private void sendResponseAck(boolean res, InetAddress ip, ResponsePacket rp, int rcvdSeqNo)
 	{
 		System.out.println("Sent packkkky!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 		rp.ack = true;
-		rp.result = res;
-		Packet p = new Packet(PacketSequenceNos.QUIZ_RESPONSE_SERVER_ACK, false, false, false, Utilities.serialize(rp));
-		p.quizPacket = true;
+		rp.result = res;  
+                
+		Packet p = new Packet(rcvdSeqNo, PacketTypes.QUESTION_RESPONSE , true, Utilities.serialize(rp));
+                
 		UDPReliableHelperClass.sendDatagramPacket(sendSocket, ip, Utilities.clientPort, p);
 	}
 	
@@ -802,6 +871,8 @@ public class Quiz extends Thread
 		byte[] b  = new byte[Utilities.MAX_BUFFER_SIZE];
 		DatagramPacket p = new DatagramPacket(b, b.length);
 		
+                Packet rcvdQuestion = null;
+                
 		while( true )
 		{
 			int count = 0;
@@ -815,6 +886,7 @@ public class Quiz extends Thread
 				}
 				catch( SocketTimeoutException e )
 				{
+                                        System.out.println("Timeout "+count);
 					if( count < questionTimelimitInSeconds )
 					{
 						count++;
@@ -825,7 +897,7 @@ public class Quiz extends Thread
 						/*
 						 * Timeout done
 						 */
-						if( packy == null )
+						if( rcvdQuestion == null )
 						{
 //							System.out.println("None of the questions are formed from current group.\nPress any key to give a chance again to the same group");
 //							String useless_input = Utilities.scan.nextLine();
@@ -880,20 +952,37 @@ public class Quiz extends Thread
 				clientIP = p.getAddress();
 				packy = (Packet)Utilities.deserialize(b);
 				
-				/*
-				 * Send an ack back now 
-				 */
-				Packet ackPacket = new Packet(PacketSequenceNos.SEQ_NOT_NEEDED, PacketTypes.QUESTION_ACK, true, packy.data);
+                                System.out.println(" I got a packet with "+packy.seq_no+" "+packy.ack+" "+packy.type);
+                                
+                                int currentSeqNo = packy.seq_no;
+                                
+                                if( packy.type == PacketTypes.QUESTION_SEND && packy.ack == false )
+                                {
+                                        System.out.println(" i am inside wohooo");
+                                        /*
+                                         * Send an ack back now 
+                                         */
+                                        Packet ackPacket = new Packet(currentSeqNo, PacketTypes.QUESTION_SEND, true, packy.data);
+
+                                        byte[] ackPacketBytes = Utilities.serialize(ackPacket);	
+                                        DatagramPacket ackPackDgram = new DatagramPacket(ackPacketBytes, ackPacketBytes.length,clientIP,Utilities.clientPort);
+                                        try {
+                                                sendSocket.send(ackPackDgram);
+                                        } catch (IOException e) {
+                                                // TODO Auto-generated catch block
+                                                e.printStackTrace();
+                                        }
+                                        rcvdQuestion = packy;
+                                }
+                                else
+                                {
+                                        continue;
+                                }
 				
-				byte[] ackPacketBytes = Utilities.serialize(ackPacket);	
-				DatagramPacket ackPackDgram = new DatagramPacket(ackPacketBytes, ackPacketBytes.length,clientIP,Utilities.clientPort);
-				try {
-					sendSocket.send(ackPackDgram);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
 			}
+                        
+                        System.out.println("Timeout complete");
+                        
 			/*
 			 * Now ack is sent and session time is over, Do the processing
 			 */
@@ -903,9 +992,9 @@ public class Quiz extends Thread
                         /*
                             Check if the packet is of question type or not. If not reject it and continue listening
                         */
-			if( packy.type == PacketTypes.QUIZ_QUESTION_ASK && packy.ack == false )
+			if( rcvdQuestion.type == PacketTypes.QUESTION_SEND && rcvdQuestion.ack == false )
 			{
-				QuestionPacket qp = (QuestionPacket)Utilities.deserialize(packy.data);
+				QuestionPacket qp = (QuestionPacket)Utilities.deserialize(rcvdQuestion.data);
 				
                                 /*
                                     Client should set this flag to false
@@ -1053,7 +1142,7 @@ public class Quiz extends Thread
                                         tff.setVisible(false);
                                         mcf.setVisible(false);
                                         
-//					System.out.println("Is the question valid ? Press 1 for accepting it, 2 for rejecting it");
+					System.out.println("Is the question valid ? Press 1 for accepting it, 2 for rejecting it");
 //					int a = Utilities.scan.nextInt();
 					
 					if( a==1 )
@@ -1063,26 +1152,67 @@ public class Quiz extends Thread
 						 */
 						qp.questionAuthenticated = true;
 						
-						Packet qpack = new Packet(Utilities.seqNo, PacketTypes.QUESTION_VALIDITY, true ,Utilities.serialize(qp));
+						Packet qpack = new Packet(Utilities.seqNo, PacketTypes.QUESTION_VALIDITY, false ,Utilities.serialize(qp));
 						
 						/*
 						 * Send to every one in that group
 						 * 1st send to leader, then to every one in that group
 						 */
+//						
+//						UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
+//                                                
+//                                                if( UDPReliableHelperClass.sendToLeader_UDP_Reliable(sendSocket, recvSocket, currentGrp, qpack) == false )
+//                                                {
+//                                                    /*
+//                                                        Group is removed due to insufficient students
+//                                                    */
+//                                                    System.out.println("Group is removed");
+//                                                    /*
+//                                                        Code for removing the group
+//                                                    */
+//                                                    
+//                                                    Iterator<Group> itDelete = groups.iterator();
+//                    
+//                                                    while( itDelete.hasNext() )
+//                                                    {
+//                                                        if( itDelete.next().equals(currentGrp) )
+//                                                        {
+//                                                            /*
+//                                                                Found the grp, Now Deleting the group
+//                                                            */
+//                                                            itDelete.remove();
+//                                                            break;
+//                                                        }
+//                                                    }
+//                                                    /*
+//                                                        Return NULL, so that next grp will get turn
+//                                                    */
+//                                                    return null;
+//                                                }
+                                                
+     /*
+                                                
+     TODO   
+      
+     Only in the leader interface we can delete and make another group member as a leader and change his screen to answer the question
+     But here i am deleting and making otherone as a leader and sending him the packet. Which wont work
+                                                
+     */
+                                                if( sendToLeader_HandleGroupDeletion(sendSocket, recvSocket, currentGrp, qpack) == false )
+                                                {
+                                                    return null;
+                                                }
 						
-						UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
-						
-						for(int i=0;i<currentGrp.teamMembers.size();i++)
-						{
-							Student s = currentGrp.teamMembers.get(i);
-							qpack.seq_no = Utilities.seqNo;
-							UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,s.IP, qpack);
-						}
-						
+                                                /*
+                                                    Now send it to everyone in the group
+                                                */
+                                                UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, currentGrp, qpack);
 						/*
 						 * Everyone is being notified in that group
 						 */
 						
+                                                // ---------------------------------------------------------------------------------------
+                                                
 						/*
 						 * Now teacher enters the level of the question
 						 */
@@ -1109,7 +1239,6 @@ public class Quiz extends Thread
                                                 /*
                                                     Display packet sending wait page 
                                                 */
-                                               
                                                 
                                                 try
                                                 {
@@ -1133,44 +1262,55 @@ public class Quiz extends Thread
 						qp.questionSeqNo = qseq_no;
 						qp.questionAuthenticated = true;
 						
-						qpack = new Packet(Utilities.seqNo, false, false, false, Utilities.serialize(qp));
-						qpack.quizPacket = true;
-						qpack.ack = false;
-						qpack.type = PacketTypes.QUESTION_BROADCAST;
-						
-						for( int i=0;i<groups.size();i++ )
+						qpack = new Packet(Utilities.seqNo, PacketTypes.QUESTION_BROADCAST, false , Utilities.serialize(qp));
+	
+                                                Iterator<Group> grpIter = groups.iterator();
+                                                
+						while( grpIter.hasNext() )
 						{
-							Group g = groups.get(i);
-							if( g.equals(currentGrp))
+							
+                                                        Group g = grpIter.next();
+                                                        
+                                                        System.out.println("Current grp is "+currentGrp.groupName+" and loopgrp is "+g.groupName);
+                                                        
+							if( g.groupName.equals(currentGrp.groupName))
 							{
+                                                                /*
+                                                                    Current grp already handled.
+                                                                    SKip it
+                                                                */
+                                                                System.out.println("Already handeld");
 								continue;
 							}
 							/*
 							 * Send to the leader of the group
 							 */
 							qpack.seq_no = Utilities.seqNo;
-							if( UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,g.leaderRecord.IP, qpack) == Utilities.SUCCESS )
-							{
-								/*
-								 * If the question is sent successfully then increment the no of questions attempted for the leader
-								 */
-								g.leaderRecord.noOfQuestions++;
-							}
+//		
+                                                        System.out.println("Trying");
+                                                        if( UDPReliableHelperClass.sendToLeader_UDP_Reliable(sendSocket, recvSocket, g, qpack) == false )
+                                                        {
+                                                            /*
+                                                                Group is removed because of insufficient students in it
+                                                            */
+                                                            grpIter.remove();
+                                                            continue;
+                                                        }
+                                                        else
+                                                        {
+                                                            /*
+                                                             * If the question is sent successfully then increment the no of questions attempted for the leader
+                                                            */
+                                                            g.leaderRecord.noOfQuestions++;
+                                                        }
+                               
 							/*
 							 * Send to team members of the group
 							 */
-							for( int j=0;j<g.teamMembers.size();j++ )
-							{
-								Student stud = g.teamMembers.get(j);
-								qpack.seq_no = Utilities.seqNo;
-								if( UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,stud.IP, qpack) == Utilities.SUCCESS )
-								{
-									/*
-									 * If the question is sent successfully then increment the no of questions attempted for the student
-									 */
-									stud.noOfQuestions++;
-								}
-							}
+                                                        
+                                                        qpack.seq_no = Utilities.seqNo;
+                                                        
+							UDPReliableHelperClass.sendToTeamMate_UDP_Reliable_and_IncreaseQuestionsAttempted(sendSocket, recvSocket, g, qpack);
 						}
 						questionLevel = level;
 						return questionFormed;
@@ -1178,7 +1318,7 @@ public class Quiz extends Thread
 					else if( a==2 )
 					{
 						/*
-						 * Send reject packet
+						 * Send reject packet to the leader
 						 */
                                                  
 						qp.questionAuthenticated = false;
@@ -1188,12 +1328,48 @@ public class Quiz extends Thread
 						qpack.ack = false;
 						qpack.quizPacket = true;
 
-						UDPReliableHelperClass.sendToClient_Reliable(sendSocket, recvSocket,clientIP, qpack);
+                                                if( sendToLeader_HandleGroupDeletion(sendSocket, recvSocket, currentGrp, qpack) == false )
+                                                {
+                                                    return null;
+                                                }
 					}
 				}
 			}
 		}
 	}
+        
+        private boolean sendToLeader_HandleGroupDeletion(DatagramSocket sendSocket, DatagramSocket recvSocket, Group currentGrp, Packet qpack)
+        {
+            if( UDPReliableHelperClass.sendToLeader_UDP_Reliable(sendSocket, recvSocket, currentGrp, qpack) == false )
+            {
+                /*
+                    Group is removed due to insufficient students
+                */
+                System.out.println("Group is removed");
+                /*
+                    Code for removing the group
+                */
+
+                Iterator<Group> itDelete = groups.iterator();
+
+                while( itDelete.hasNext() )
+                {
+                    if( itDelete.next().equals(currentGrp) )
+                    {
+                        /*
+                            Found the grp, Now Deleting the group
+                        */
+                        itDelete.remove();
+                        break;
+                    }
+                }
+                /*
+                    Return NULL, so that next grp will get turn
+                */
+                return false;
+            }
+            return true;
+        }
 	
 	private boolean sendInterfacePacketBCast(Group activeGrp)
 	{

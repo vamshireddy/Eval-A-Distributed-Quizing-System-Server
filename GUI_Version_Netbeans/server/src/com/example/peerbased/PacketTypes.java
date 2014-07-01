@@ -8,7 +8,6 @@ public class PacketTypes {
 	public static final byte QUIZ_INTERFACE_START_PACKET = 4;
 	public static final byte QUESTION_VALIDITY = 5;
 	public static final byte QUESTION_BROADCAST = 6;
-	public static final byte QUESTION_ACK = 7;
         public static final byte QUIZ_END_PACKET = 8;
         	/*
 	 * Authentication
@@ -28,4 +27,6 @@ public class PacketTypes {
             Question asking session
         */
         public static final byte QUIZ_QUESTION_ASK = 15;
+	public static final byte QUESTION_SEND = 16;
+        public static final byte QUESTION_RESPONSE = 17;
 }

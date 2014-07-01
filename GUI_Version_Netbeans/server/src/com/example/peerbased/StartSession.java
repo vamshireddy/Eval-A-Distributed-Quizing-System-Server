@@ -1,6 +1,8 @@
 package com.example.peerbased;
 import DatabaseGUI.Essentials;
-import DatabaseGUI.HomePage;
+import DatabaseGUI.HomePageDB;
+import GUI.OnlineStudentsPage;
+import GUI.StartPage;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -12,6 +14,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import com.mysql.jdbc.Connection;
 import com.mysql.jdbc.PreparedStatement;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 class StartSession {
 	
@@ -24,7 +28,10 @@ class StartSession {
 	private ArrayList<Student> studentsList; // List of students who are connected during the session
 	private DatabaseQueries queryObject;
 	private String standard;
-	
+        private GUI.HomePage hpage;
+        private OnlineStudentsPage ospage;
+	private StartPage spage;
+        
 	public StartSession() {
 		teacherName = "default";
 		teacherID = "default";
@@ -35,11 +42,19 @@ class StartSession {
 		studentsList = null;
 		queryObject = null;
 		standard = "";
+                hpage = new GUI.HomePage();
 	}
 	
 	public StartSession(Connection db)
 	{
 		this();
+                Essentials.objHomePage = new HomePageDB();
+                ospage = new OnlineStudentsPage();
+                ospage.reset();
+                
+                spage = new StartPage();
+                spage.reset();
+                
 		databaseConnection = db;
 		studentsList = StudentListHandler.getList();
 		/*
@@ -110,13 +125,32 @@ class StartSession {
 	{	
 		while(true)
 		{
-			System.out.println("Enter your userID and password and standard: ");
-			teacherID = Utilities.scan.nextLine();
-			teacherPassword = Utilities.scan.nextLine();
-                        standard = Utilities.scan.nextLine();
-			
+//			System.out.println("Enter your userID and password and standard: ");
+//			teacherID = Utilities.scan.nextLine();
+//			teacherPassword = Utilities.scan.nextLine();
+//                        standard = Utilities.scan.nextLine();
+                        spage.setVisible(true);
+                        
+                        while( spage.getWaitStatus()== true )
+                        {
+                            try {
+                                Thread.sleep(200);
+                            } catch (InterruptedException ex) {
+                                Logger.getLogger(StartSession.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                        }
+                        
+                        teacherID = spage.getUID();
+                        teacherPassword = spage.getPass();
+                        standard = spage.getStd();
+                        
+                        spage.reset();
+                        
+                        
+                    
 			if( verifyDetails() )
 			{
+                                spage.setVisible(false);
 				printWelcomeMessage();
 				/*
 				 * For displaying the options multiple times
@@ -127,7 +161,6 @@ class StartSession {
 					retVal = showOptions();
 				}
 				while( retVal!=-1 );
-				break;
 			}
 			else
 			{
@@ -138,17 +171,46 @@ class StartSession {
 	
 	public int showOptions()
 	{
-		System.out.println("1.Configure Student Details\n2.Start a Quiz\n3.View Performance of student\n"+
-									"4.View Questions in Database\n5.Upload any Documents\n6.View Online Students\n7.Exit");
-		int choice = Utilities.scan.nextInt();
+            
+                /*
+                    Display Home Page
+                */
+                
+                
+                hpage.setVisible(true);
+                
+                while( hpage.getWaitStatus() == true )
+                {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(StartSession.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+                
+                int choice = hpage.getChoice();
+                hpage.reset();
+                
+                System.out.println("Got "+choice);
+                
 		switch(choice)
 		{
-			case 1: // This case needs to access student database
-                                        
-                                        Essentials.objHomePage = new HomePage();
+			case 1:         // This case needs to access student database
+                                        hpage.setVisible(false);
                                         Essentials.objHomePage.setVisible(true);
+                                        
+                                        while( Essentials.objHomePage.getExitStatus() == false )
+                                        {
+                                            try {
+                                                Thread.sleep(200);
+                                            } catch (InterruptedException ex) {
+                                                Logger.getLogger(StartSession.class.getName()).log(Level.SEVERE, null, ex);
+                                            }
+                                        }
+                                        Essentials.objHomePage.reset();
 					break;
-			case 2:	// Initiates the Quiz
+                            
+			case 2:         // Initiates the Quiz
 					quiz = new Quiz( subject,teacherName,databaseConnection);
 					// This initiates the quiz with the parameters specified above
 					try
@@ -160,29 +222,37 @@ class StartSession {
                                             e.printStackTrace();
                                         }
 					break;
-//			case 3:	
-//					break;
-//			case 4: // This case needs to access student database ( Questions in database )
-//					break;
-//			case 5: // Upload Documents 
-//					break;
-//			case 6: // Exit
-//					displayStudents();
-//					break;
-//			case 7: return -1;
+                        case 3 :        displayStudents(ospage);
+                                        ospage.setVisible(true);
+                                        
+                                        System.out.println(ospage.getWaitStatus());
+                                        
+                                        while(ospage.getWaitStatus() == true )
+                                        {
+                                            try {
+                                                Thread.sleep(200);
+                                            } catch (InterruptedException ex) {
+                                                Logger.getLogger(StartSession.class.getName()).log(Level.SEVERE, null, ex);
+                                            }
+                                        }
+                                        ospage.reset();
+					break;
 			
-		    default: return -1;
+                        case -1 :       hpage.setVisible(false);
+                                        return -1;
+                                        
 		}
 		return 1;
 	}
 	
-	public void displayStudents()
+	public void displayStudents(OnlineStudentsPage ospage)
 	{
 		System.out.println("These are the students who are logged in right now!");
 		for(int i=0;i<studentsList.size();i++)
 		{
 			Student s = studentsList.get(i);
 			System.out.println("Name : "+s.name+" "+" IP : "+s.IP+" "+" ID : "+s.uID);
+                        ospage.addStudent(("Name : "+s.name+" "+" IP : "+s.IP+" "+" ID : "+s.uID));
 		}
 	}
 	
