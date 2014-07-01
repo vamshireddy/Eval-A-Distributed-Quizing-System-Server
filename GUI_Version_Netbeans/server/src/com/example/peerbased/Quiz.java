@@ -1,9 +1,11 @@
 package com.example.peerbased;
+import GUI.HomePage;
 import GUI.LevelFrame;
 import GUI.MultipleChoiceFrame;
 import GUI.OneWordFrame;
 import GUI.QuestionTimeExtension;
 import GUI.QuestionWaitPage;
+import GUI.QuizEndError;
 import GUI.QuizParametersGUI;
 import GUI.QuizStartPage;
 import GUI.QuizStats;
@@ -84,14 +86,17 @@ public class Quiz extends Thread
         private ResponseWait rw;
         private QuestionTimeExtension ext;
         public static RetryPacketSend rps;
+        public HomePage hp;
+        private waitPageGUI waitbackground;
         
 	/* Constructor */
-	public Quiz(String subject,String teacherName, Connection c)
+	public Quiz(String subject,String teacherName, Connection c, HomePage hp, waitPageGUI waitBackground)
 	{
             
                 /*
                     GUI FRAME INITIALIZATION
                 */
+                this.hp = hp;
                 qwp = new QuestionWaitPage();
                 mcf = new MultipleChoiceFrame();
                 tff = new TrueOrFalseFrame();
@@ -102,6 +107,7 @@ public class Quiz extends Thread
                 ext = new QuestionTimeExtension();
                 qwp = new QuestionWaitPage();
                 rps = new RetryPacketSend();
+                waitbackground = waitBackground;
                 /*
                     GUI FRAME INITIALIZATION
                 */
@@ -385,8 +391,29 @@ public class Quiz extends Thread
 		for(int i=0;i<noOfRounds;i++)
 		{
 			/*
-			 * Rounds
+			 *                                   Rounds
 			 */
+                         
+                        /*
+                            Check if the no of groups are less than equal to 1, If it is then end the quiz!
+                        */
+                        
+                        if( groups.size() <= 1 )
+                        {
+                            QuizEndError quizend = new QuizEndError();
+                            quizend.setVisible(true);
+                            
+                            try {
+                                Thread.sleep(5000);
+                            } catch (InterruptedException ex) {
+                                Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                            
+                            qwp.setVisible(false);
+                            quizend.setVisible(false);
+                            break;
+                        }
+                        
 			for (int j=0;j<groups.size();j++)
 			{
 				/*
@@ -441,19 +468,20 @@ public class Quiz extends Thread
 				UDPReliableHelperClass.cleanBuffer(recvSocket);
 			}
 		}
-                
-                QuizStats qstat = new QuizStats();
-                qstat.setVisible(true);
-                
+
                 /*
                     Quiz is completed. Send results
                 */
+                
+                HashMap<String, Integer> groupScores = new HashMap<>();
                 
                 Packet packy = new Packet(Utilities.seqNo, PacketTypes.QUIZ_END_PACKET, false, null );
                 QuizResultPacket qrp = new QuizResultPacket(-1,-1,-1);
                 
                 for(Group loopGrp : groups)
 		{
+                    
+                        int score = 0;
                         /*
                             Iterate through the groups and send marks to the students
                         */
@@ -463,6 +491,12 @@ public class Quiz extends Thread
                         */
                         
                         Student l = loopGrp.leaderRecord;
+                        
+                        score+=l.marks;
+                        
+                        /*
+                            Add leader score to group score
+                        */
                         
                         /*
                             Set the student's marks
@@ -490,6 +524,8 @@ public class Quiz extends Thread
                         for( Student s : loopGrp.teamMembers )
                         {
                             
+                            score+=s.marks;
+                            
                             qrp.marks = s.marks;
                             qrp.noOfQuesAttempted = s.noOfQuestions;
                             qrp.noOfQuesCorrect = s.noOfAnswers;
@@ -512,22 +548,46 @@ public class Quiz extends Thread
                             AddRecordToDatabase(s);
                         }
                         
+                        
+                        /*
+                            Add group score to the hashmap
+                        */
+                        
+                        groupScores.put(loopGrp.groupName, score);
                 }
                 /*
                     Show bar chart about groups.
                 */
+                                
+                QuizStats qstat = new QuizStats(groupScores);
+                qstat.setVisible(true);
                 
                 /*
                     Show the Home Page GUI
                 */
+                
+                while( qstat.getWaitStatus() == true )
+                {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(Quiz.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+                
+                waitbackground.setVisible(false);
+                qstat.setVisible(false);
+                hp.reset();
+                hp.setVisible(true);
+                
 	}
         
         private void AddRecordToDatabase(Student s)
         {
             try
             {
-                String query = "insert into student_performance values ( '"+s.uID+"','"+s.name+"','"+subject+"','"+standard+"',"
-                        +"CURDATE()"+",'"+s.noOfQuestions+"','"+s.noOfAnswers+"','"+s.marks+"')";
+                String query = "insert into student_performance values ( '"+s.uID+"','"+subject+"','"+standard+"',"
+                        +"CURDATE()"+",CURTIME(),'"+s.noOfQuestions+"','"+s.noOfAnswers+"','"+s.marks+"')";
                 System.out.println("Query is "+query);
                 PreparedStatement ps  = (PreparedStatement)con.prepareStatement(query);
                 ps.executeUpdate();  

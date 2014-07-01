@@ -3,6 +3,7 @@ import DatabaseGUI.Essentials;
 import DatabaseGUI.HomePageDB;
 import GUI.OnlineStudentsPage;
 import GUI.StartPage;
+import GUI.waitPageGUI;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -118,7 +119,7 @@ class StartSession {
 	
 	public void printWelcomeMessage()
 	{
-		System.out.println("Hello "+teacherName+", Have a Nice time teaching "+subject+" ! ");
+		System.out.println("Hello "+teacherName+"!, Have a Nice time teaching "+subject+" ! ");
 	}
 	
 	public void start()
@@ -176,7 +177,7 @@ class StartSession {
                     Display Home Page
                 */
                 
-                
+                hpage.setText("Hello "+teacherName+"! have a nice time teaching "+subject);
                 hpage.setVisible(true);
                 
                 while( hpage.getWaitStatus() == true )
@@ -193,6 +194,14 @@ class StartSession {
                 
                 System.out.println("Got "+choice);
                 
+                /*
+                    Run a wait page in the background
+                */
+                
+                waitPageGUI wp = new waitPageGUI();
+                wp.setText("Please wait!");
+                wp.setVisible(true);
+                
 		switch(choice)
 		{
 			case 1:         // This case needs to access student database
@@ -208,10 +217,12 @@ class StartSession {
                                             }
                                         }
                                         Essentials.objHomePage.reset();
+                                        wp.setVisible(false);
 					break;
                             
 			case 2:         // Initiates the Quiz
-					quiz = new Quiz( subject,teacherName,databaseConnection);
+                                        hpage.setVisible(false);
+					quiz = new Quiz( subject,teacherName,databaseConnection, hpage, wp);
 					// This initiates the quiz with the parameters specified above
 					try
                                         {
@@ -222,7 +233,9 @@ class StartSession {
                                             e.printStackTrace();
                                         }
 					break;
-                        case 3 :        displayStudents(ospage);
+                        
+                        case 3 :        hpage.setVisible(false);
+                                        displayStudents(ospage);
                                         ospage.setVisible(true);
                                         
                                         System.out.println(ospage.getWaitStatus());
@@ -236,9 +249,11 @@ class StartSession {
                                             }
                                         }
                                         ospage.reset();
+                                        wp.setVisible(false);
 					break;
 			
                         case -1 :       hpage.setVisible(false);
+                                        wp.setVisible(false);
                                         return -1;
                                         
 		}

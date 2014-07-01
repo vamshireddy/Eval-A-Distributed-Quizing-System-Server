@@ -22,7 +22,7 @@ public class MainClass {
 		try 
 		{
 			Class.forName("com.mysql.jdbc.Driver");
-			Connection con = (Connection)DriverManager.getConnection("jdbc:mysql://localhost:3306/quizAppNew","root","reddy123");
+			Connection con = (Connection)DriverManager.getConnection("jdbc:mysql://localhost:3306/QuizFinalDB","root","reddy123");
 			/*
                                 Session object is created to start the Application
                         */
