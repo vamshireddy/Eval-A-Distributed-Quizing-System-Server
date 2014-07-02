@@ -291,7 +291,7 @@ class ServeFunction extends Thread
             */
             PreparedStatement p = null;
             try {
-                p = (PreparedStatement)con.prepareStatement("select * from student_performance"+" where roll_number='"+id+"' and subject='"+sub+"' order by date desc");
+                p = (PreparedStatement)con.prepareStatement("select * from student_performance"+" where roll_number='"+id+"' and subject='"+sub+"' order by date desc,time desc");
                 ResultSet result = p.executeQuery();
                 
                 HashMap<String,String> hm = new HashMap<>();

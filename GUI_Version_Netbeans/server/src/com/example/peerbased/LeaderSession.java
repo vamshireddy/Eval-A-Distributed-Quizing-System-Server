@@ -3,6 +3,7 @@ package com.example.peerbased;
 import GUI.DisplayGroups;
 import GUI.DisplayLeaders;
 import GUI.LeaderSessionWait;
+import GUI.OnlineStudentsPage;
 import GUI.waitPageGUI;
 import com.mysql.jdbc.Util;
 import java.awt.Dialog;
@@ -389,13 +390,7 @@ public class LeaderSession extends Thread{
 		/* 
 		 * This function broadcast's the leaders to the students ( who are not leaders ) and sends a groupname request to leaders
 		 */
-            
-                LeaderPacket lp = new LeaderPacket();
-		/*
-		 * Switch on the groupName request flag
-		 */
-		lp.grpNameRequest = true;
-		Packet sendPacky = new Packet(Utilities.seqNo, PacketTypes.LEADER_SCREEN_CHANGE, false, Utilities.serialize(lp));
+		Packet sendPacky = new Packet(Utilities.seqNo, PacketTypes.LEADER_SCREEN_CHANGE, false, null);
                 /*
                     Send it to the leaders
                 */
@@ -468,10 +463,20 @@ public class LeaderSession extends Thread{
 		}
                 
                 
-                LeaderPacket lpTeam = new LeaderPacket();
-		lpTeam.LeadersListBroadcast = true; // This is flag to differentiate the list packet for non-leaders and group name selection packet for leaders
-		lpTeam.leaders = leaderRequests;			// Add the leaders
-                Packet sendPackyTeam = new Packet(Utilities.seqNo,PacketTypes.LEADER_SCREEN_CHANGE,false,Utilities.serialize(lpTeam));
+//                LeaderPacket lpTeam = new LeaderPacket();
+//		lpTeam.LeadersListBroadcast = true; // This is flag to differentiate the list packet for non-leaders and group name selection packet for leaders
+//		lpTeam.leaders = leaderRequests;			// Add the leaders
+                
+                String Onlineleaders[] = new String[leaderRequests.size()];
+                
+                int index = 0;
+                for(Leader lead : leaderRequests)
+                {
+                    Onlineleaders[index++] = lead.id;
+                }
+                
+                OnlineLeadersPacket olpack = new OnlineLeadersPacket(Onlineleaders);
+                Packet sendPackyTeam = new Packet(Utilities.seqNo,PacketTypes.ONLINE_LEADERS,false,Utilities.serialize(olpack));
 		
                 
                 Iterator<Student> stuIter = studentsList.iterator();

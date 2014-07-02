@@ -29,4 +29,6 @@ public class PacketTypes {
         public static final byte QUIZ_QUESTION_ASK = 15;
 	public static final byte QUESTION_SEND = 16;
         public static final byte QUESTION_RESPONSE = 17;
+                
+        public static final byte ONLINE_LEADERS = 18;
 }

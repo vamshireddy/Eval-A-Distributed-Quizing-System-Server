@@ -123,10 +123,13 @@ public class StudentLogin extends Thread{
                         */
 		    	continue;
 		    }
-                    
+                  
                     System.out.println("data packet "+data_packet.data+" overall : "+data_packet);
                     
 		    auth_packet = (AuthPacket)Utilities.deserialize(data_packet.data);
+                    
+                      
+                    System.out.println("user is : "+auth_packet.userID+" password is "+auth_packet.password);
                     
                     
 		    HashMap<String,String> studentNameAndStd = verifyDetails(auth_packet.userID, auth_packet.password);
@@ -283,7 +286,7 @@ public class StudentLogin extends Thread{
 			}
 			catch( NumberFormatException e )
 			{
-				return null;
+                                    return null;
 			}
 			PreparedStatement p = (PreparedStatement)con.prepareStatement("select * from student_info where roll_number='"+id_int+
 																"' and password='"+password+"'");

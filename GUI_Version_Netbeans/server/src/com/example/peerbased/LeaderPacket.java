@@ -13,16 +13,11 @@ public class LeaderPacket implements Serializable {
 	public String uID;
 	public String uName;
 	public boolean granted;
-	public boolean LeadersListBroadcast;
-	public ArrayList<Leader> leaders;
-	public boolean grpNameRequest;
 	
 	public LeaderPacket() {
 		granted = false;
-		LeadersListBroadcast = false;
-		leaders = null;
-		uID = "";
-		grpNameRequest = false;
+		uID = null;
+                uName = null;
 	}
 	public LeaderPacket(boolean t)
 	{

@@ -134,9 +134,7 @@ public class UDPReliableHelperClass {
                         
                         System.out.println("Forming a new packet");
                         
-                        SelectedGroupPacket sgp = new SelectedGroupPacket(loopGrp.groupName , loopGrp.leaderRecord, loopGrp.teamMembers);
-                        
-                        pack = new Packet(Utilities.seqNo, pack.type , false, Utilities.serialize(sgp));
+                        pack = new Packet(Utilities.seqNo, pack.type , false, loopGrp.groupName.getBytes());
                     }
                     else if( pack.type == PacketTypes.QUIZ_INTERFACE_START_PACKET )
                     {

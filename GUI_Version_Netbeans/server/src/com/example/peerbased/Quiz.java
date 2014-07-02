@@ -339,7 +339,7 @@ public class Quiz extends Thread
                     From Now on use Groups. Dont use Student's list as some new students may enter into student's list in the middle
                 */
 
-		sendGroupsToStudents(groups);
+		sendGroupAck(groups);
                 /*
 		 * Quiz Starts here
 		 * Get the parameters required for Quiz.
@@ -453,7 +453,7 @@ public class Quiz extends Thread
 				}
                                 
                                 
-				HashMap<String,Double> stats = getResponses(questionSeqNo, questionFormed);  
+				HashMap<String,Double> stats = getResponses(questionSeqNo, questionFormed, g);  
 				/*
 				 * Calculate the marks according to the level
 				 */
@@ -646,6 +646,7 @@ public class Quiz extends Thread
                         if( leader.uID.equals(stud) )
                         {
                             leader.marks += 2;
+                            leader.noOfAnswers++;
                         }
                         
                         /*
@@ -657,6 +658,7 @@ public class Quiz extends Thread
                             if( s.uID.equals(stud) )
                             {
                                 s.marks += 2;
+                                s.noOfAnswers++;
                             }
                         }
                         
@@ -675,7 +677,7 @@ public class Quiz extends Thread
                 }
 	}
 	
-	private HashMap<String,Double> getResponses(int qseq_no, HashMap<String,String> questionFormed)
+	private HashMap<String,Double> getResponses(int qseq_no, HashMap<String,String> questionFormed, Group activeGrp)
 	{
                 /*
                     Start the GUI for the reponse listening
@@ -872,21 +874,21 @@ public class Quiz extends Thread
                 {
                     case 1 :   for(int i=0;i<4;i++)
                                {
-                                   double a = ((float)responseCount[i]/getStudentCount())*100;
+                                   double a = ((float)responseCount[i]/getStudentCount(activeGrp))*100;
                                    stats.put(responseOptions[i],a);
                                }
                                break;
                         
                     case 2  :  for(int i=0;i<2;i++)
                                {
-                                   double a = ((float)responseCount[i]/getStudentCount())*100;
+                                   double a = ((float)responseCount[i]/getStudentCount(activeGrp))*100;
                                    stats.put(responseOptions[i],a);
                                }
                                break;
                         
                     case 3  :  for(int i=0;i<2;i++)
                                {
-                                   double a = ((float)responseCount[i]/getStudentCount())*100;
+                                   double a = ((float)responseCount[i]/getStudentCount(activeGrp))*100;
                                    stats.put(responseOptions[i],a);
                                }
                                break;
@@ -901,11 +903,15 @@ public class Quiz extends Thread
 		return stats;
 	}
         
-        private int getStudentCount()
+        private int getStudentCount(Group activeGrp)
         {
             int count = 0;
             for( Group g : groups )
             {
+                if( g.groupName.equals(activeGrp.groupName) )
+                {
+                    continue;
+                }
                 count++;
                 count += g.teamMembers.size();
             }
@@ -1078,6 +1084,7 @@ public class Quiz extends Thread
                                                 /*
                                                     Create a new JFrame for Multiple Choice questions and set it.
                                                 */
+                                                
 						System.out.println("---------------------------Question-------------------------------\n"+qp.question);
 						for(int i=0;i<4;i++)
 						{
@@ -1113,11 +1120,11 @@ public class Quiz extends Thread
                                                 
                                                 a = mcf.getSelectedOption();
                                                 mcf.reset();
+                                                
 					}
 					else if( qp.questionType == 2 )
 					{
                                             
-                                                   
                                                 /*
                                                     Add the question type to the HashMap
                                                 */
@@ -1569,7 +1576,7 @@ public class Quiz extends Thread
                 return grpString;
 	}
         
-	private void sendGroupsToStudents(ArrayList<Group> grpy)
+	private void sendGroupAck(ArrayList<Group> grpy)
 	{
                 
             Iterator<Group> loopGrp = grpy.iterator();
@@ -1579,16 +1586,12 @@ public class Quiz extends Thread
                 
                 Group curGrp = loopGrp.next();
                 
-                SelectedGroupPacket sgp = new SelectedGroupPacket(curGrp.groupName , curGrp.leaderRecord, curGrp.teamMembers);
+                String gname = curGrp.groupName;
                 
-                byte[] ser = Utilities.serialize(sgp);
-                
-                Packet p = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, ser);
-                
+                Packet p = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, gname.getBytes());
                 /*
                     Now send it to the leader
                 */
-                
                 if( UDPReliableHelperClass.sendToLeader_UDP_Reliable(sendSocket, recvSocket, curGrp, p) == false )
                 {
                     /*
@@ -1597,23 +1600,10 @@ public class Quiz extends Thread
                     loopGrp.remove();
                     continue;
                 }
-                
-                /*
-                    Group may be updated, So form the packet again
-                */
-                
-                SelectedGroupPacket sgpUpdated = new SelectedGroupPacket(curGrp.groupName , curGrp.leaderRecord, curGrp.teamMembers);
-                
-                byte[] serUpdated = Utilities.serialize(sgp);
-                
-                Packet pUpdated = new Packet(Utilities.seqNo, PacketTypes.GROUP_DETAILS_MESSAGE, false, ser);
-                
                 /*
                     Now send it to the team member students
                 */
-                
-                UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, curGrp, pUpdated);
-                
+                UDPReliableHelperClass.sendToTeamMate_UDP_Reliable(sendSocket, recvSocket, curGrp, p);
             }
         }
 //		while( iter.hasNext() )
